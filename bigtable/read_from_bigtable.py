@@ -1,0 +1,55 @@
+import argparse
+import datetime
+
+import struct
+import numpy as np
+import tensorflow as tf
+# from tqdm import tqdm
+
+from google.cloud import bigtable
+from google.cloud.bigtable import row_filters
+from protobuf.experience_replay_pb2 import Trajectory, Info
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser('Read-From-Bigtable Script')
+    parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
+    parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
+    parser.add_argument('--cbt-table-name', type=str, default='cartpole-experience-replay')
+    args = parser.parse_args()
+
+    print('Looking for the [{}] table.'.format(args.cbt_table_name))
+    client = bigtable.Client(args.gcp_project_id, admin=True)
+    instance = client.instance(args.cbt_instance_id)
+    table = instance.table(args.cbt_table_name)
+    if not table.exists():
+        print("Table doesn't exist.")
+        exit()
+    else:
+        print("Table found.")
+
+    regex_filter = '^cartpole_trajectory_[0-9]+$'
+    row_filter = row_filters.RowKeyRegexFilter(regex_filter)
+    filtered_rows = table.read_rows(filter_=row_filter)
+
+    for row in filtered_rows:
+        bytes_traj = row.cells['trajectory']['traj'.encode()][0].value
+        bytes_info = row.cells['trajectory']['info'.encode()][0].value
+        traj, info = Trajectory(), Info()
+        traj.ParseFromString(bytes_traj)
+        info.ParseFromString(bytes_info)
+
+        print("num_steps: {}".format(info.num_steps))
+        traj_shape = np.append(np.array(info.num_steps), np.array(info.vector_obs_spec))
+        print("trajectory shape: {}".format(traj_shape))
+        observations = np.array(traj.vector_obs).reshape(traj_shape)
+        
+        for i in range(info.num_steps):
+            print("obs: {}".format(observations[i]))
+            print("action: {}".format(traj.actions[i]))
+            print("reward: {}".format(traj.rewards[i]))
+            print("-----------------------------")
+
+        # DECODE CELLS WITH DEFAULT PYTHON ENCODING
+        # obs = np.frombuffer(bytes_obs, dtype=np.uint8).reshape(84,84,3)
+        # action = struct.unpack("i", bytes_action)
+        # reward = struct.unpack("f", bytes_reward)
