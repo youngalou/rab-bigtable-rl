@@ -4,11 +4,14 @@ import datetime
 import struct
 import numpy as np
 import tensorflow as tf
-# from tqdm import tqdm
 
+from google.oauth2 import service_account
 from google.cloud import bigtable
 from google.cloud.bigtable import row_filters
 from protobuf.experience_replay_pb2 import Trajectory, Info
+
+SCOPES = ['https://www.googleapis.com/auth/bigtable.admin']
+SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Read-From-Bigtable Script')
@@ -18,6 +21,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     print('Looking for the [{}] table.'.format(args.cbt_table_name))
+    credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     client = bigtable.Client(args.gcp_project_id, admin=True)
     instance = client.instance(args.cbt_instance_id)
     table = instance.table(args.cbt_table_name)
@@ -48,8 +52,3 @@ if __name__ == '__main__':
             print("action: {}".format(traj.actions[i]))
             print("reward: {}".format(traj.rewards[i]))
             print("-----------------------------")
-
-        # DECODE CELLS WITH DEFAULT PYTHON ENCODING
-        # obs = np.frombuffer(bytes_obs, dtype=np.uint8).reshape(84,84,3)
-        # action = struct.unpack("i", bytes_action)
-        # reward = struct.unpack("f", bytes_reward)

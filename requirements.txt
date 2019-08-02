@@ -1,0 +1,7 @@
+tensorflow==2.0.0-beta1
+protobuf
+gym
+tf-agents-nightly
+tf-nightly
+google-cloud-bigtable
+tqdm

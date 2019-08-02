@@ -6,12 +6,10 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
-from google.cloud import bigtable
 from google.oauth2 import service_account
+from google.cloud import bigtable
 from protobuf.experience_replay_pb2 import Trajectory, Info
 
-# from mlagents_envs import UnityEnvironment
-# from obstacle_tower_env import ObstacleTowerEnv
 import gym
 
 SCOPES = ['https://www.googleapis.com/auth/bigtable.admin']
@@ -30,9 +28,8 @@ if __name__ == '__main__':
     parser.add_argument('--max-steps', type=int, default=100)
     args = parser.parse_args()
 
-    credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-
     print('Looking for the [{}] table.'.format(args.cbt_table_name))
+    credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     client = bigtable.Client(args.gcp_project_id, admin=True, credentials=credentials)
     instance = client.instance(args.cbt_instance_id)
     table = instance.table(args.cbt_table_name)
@@ -49,8 +46,6 @@ if __name__ == '__main__':
     input()
 
     print("Initializing Unity environement...")
-    # env = UnityEnvironment(file_name=args.env_filepath, timeout_wait=10)
-    # env = ObstacleTowerEnv(environment_filename=args.env_filepath)
     env = gym.make('CartPole-v0')
     print("Environment intialized.")
 
@@ -94,15 +89,3 @@ if __name__ == '__main__':
     table.mutate_rows(rows)
     env.close()
     print("Done!")
-
-        # SET CELLS WITH DEFAULT PYTHON ENCODING
-        # row.set_cell(column_family_id=column_family_id,
-        #              column='obs'.encode(),
-        #              value=obs.tobytes())
-        # row.set_cell(column_family_id=column_family_id,
-        #              column='action'.encode(),
-        #              value=struct.pack("i", action),
-        #              timestamp=datetime.datetime.utcnow())
-        # row.set_cell(column_family_id=column_family_id,
-        #              column='reward',
-        #              value=struct.pack("f", reward))
