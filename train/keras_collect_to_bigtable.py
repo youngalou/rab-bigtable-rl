@@ -8,7 +8,9 @@ from tqdm import tqdm
 
 from google.oauth2 import service_account
 from google.cloud import bigtable
+
 from protobuf.experience_replay_pb2 import Trajectory, Info
+from train.dqn_model import DQN_Model
 
 import gym
 
@@ -26,7 +28,13 @@ if __name__ == '__main__':
     parser.add_argument('--env-filepath', type=str, default='envs/ObstacleTower/obstacletower.app')
     parser.add_argument('--num-episodes', type=int, default=5000)
     parser.add_argument('--max-steps', type=int, default=100)
+    parser.add_argument('--restore', type=str, default=None)
     args = parser.parse_args()
+
+    model = DQN_Model(num_actions=2,
+                      fc_layer_params=(200,))
+    if args.restore:
+        model.load_weights(args.restore)
 
     print('Looking for the [{}] table.'.format(args.cbt_table_name))
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
@@ -56,7 +64,7 @@ if __name__ == '__main__':
         done = False
         
         for _ in range(args.max_steps):
-            action = np.random.randint(0,2)
+            action = model.step(obs)
             new_obs, reward, done, info = env.step(action)
 
             observations.append(obs)
@@ -83,7 +91,7 @@ if __name__ == '__main__':
                         column='info'.encode(),
                         value=info.SerializeToString(),
                         timestamp=datetime.datetime.utcnow())
-        rows.append(row)
-    table.mutate_rows(rows)
+        # rows.append(row)
+    # table.mutate_rows(rows)
     env.close()
     print("Done!")
