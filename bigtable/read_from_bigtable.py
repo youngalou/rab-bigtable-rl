@@ -22,7 +22,7 @@ if __name__ == '__main__':
 
     print('Looking for the [{}] table.'.format(args.cbt_table_name))
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-    client = bigtable.Client(args.gcp_project_id, admin=True)
+    client = bigtable.Client(args.gcp_project_id, admin=True, credentials=credentials)
     instance = client.instance(args.cbt_instance_id)
     table = instance.table(args.cbt_table_name)
     if not table.exists():
@@ -31,7 +31,7 @@ if __name__ == '__main__':
     else:
         print("Table found.")
 
-    regex_filter = '^cartpole_trajectory_[0-9]+$'
+    regex_filter = '^cartpole_trajectory_[0-9]$'
     row_filter = row_filters.RowKeyRegexFilter(regex_filter)
     filtered_rows = table.read_rows(filter_=row_filter)
 

@@ -1,4 +1,5 @@
 tensorflow==2.0.0-beta1
+numpy==1.14.5
 protobuf
 gym
 tf-agents-nightly
