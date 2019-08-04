@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
+from tensorflow.keras import backend as K
 
 class DQN_Model(tf.keras.models.Model):
     def __init__(self,
@@ -19,5 +20,6 @@ class DQN_Model(tf.keras.models.Model):
     def step(self, inputs):
         inputs = np.expand_dims(inputs, 0)
         q_values = self(inputs)
-        action = tf.argmax(q_values).numpy()
+        t = tf.argmax(q_values)
+        action = K.eval(tf.argmax(q_values))
         return action
