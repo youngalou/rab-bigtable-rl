@@ -11,6 +11,9 @@ from google.cloud.bigtable import row_filters
 from protobuf.experience_replay_pb2 import Trajectory, Info
 from train.dqn_model import DQN_Model
 
+SCOPES = ['https://www.googleapis.com/auth/bigtable.admin']
+SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
+
 #MODEL HYPERPARAMETERS
 fc_layer_params = (200,)
 learning_rate = 1e-3
@@ -29,6 +32,8 @@ if __name__ == '__main__':
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
     parser.add_argument('--cbt-table-name', type=str, default='cartpole-experience-replay')
     parser.add_argument('--restore', type=str, default=None)
+    parser.add_argument('--train-steps', type=int, default=10000)
+    parser.add_argument('--period', type=int, default=100)
     args = parser.parse_args()
 
     model = DQN_Model(num_actions=2,
@@ -38,7 +43,8 @@ if __name__ == '__main__':
 
     #LOAD/CREATE CBT TABLE
     print('Looking for the [{}] table.'.format(args.cbt_table_name))
-    client = bigtable.Client(args.gcp_project_id, admin=True)
+    credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    client = bigtable.Client(args.gcp_project_id, admin=True, credentials=credentials)
     instance = client.instance(args.cbt_instance_id)
     table = instance.table(args.cbt_table_name)
     if not table.exists():
@@ -62,19 +68,31 @@ if __name__ == '__main__':
             info.ParseFromString(bytes_info)
 
             traj_shape = np.append(np.array(info.num_steps), np.array(info.vector_obs_spec))
-            observations = np.array(traj.vector_obs).reshape(traj_shape)
-            traj_obs = np.rollaxis(np.array([observations, np.roll(observations, 1)]), 0 , 2)
-            traj_actions = np.rollaxis(np.array([traj.actions, np.roll(traj.actions, 1)]), 0 , 2)
-            traj_rewards = np.rollaxis(np.array([traj.rewards, np.roll(traj.rewards, 1)]), 0 , 2)
-            traj_discounts = np.ones((info.num_steps,2))
+            obs = np.array(traj.vector_obs).reshape(traj_shape)
+            next_obs = np.roll(obs, 1)
+            input()
 
-            traj_obs = tf.constant(traj_obs, dtype=tf.float32)
-            traj_actions = tf.constant(traj_actions, dtype=tf.int32)
-            policy_info = ()
-            traj_rewards = tf.constant(traj_rewards, dtype=tf.float32)
-            traj_discounts = tf.constant(traj_discounts, dtype=tf.float32)
+            with tf.GradientTape() as tape:
+                q_pred = model(obs)
+                q_next = model(next_obs)
+                np.apply_along_axis(np.argmax())
+                q_target = traj.rewards + model(next_obs)
 
-            traj = trajectory.boundary(traj_obs, traj_actions, policy_info, traj_rewards, traj_discounts)
-            train_loss = tf_agent.train(traj)
+
+
+            # traj_obs = np.rollaxis(np.array([obs, np.roll(obs, 1)]), 0 , 2)
+            # traj_actions = np.rollaxis(np.array([traj.actions, np.roll(traj.actions, 1)]), 0 , 2)
+            # traj_rewards = np.rollaxis(np.array([traj.rewards, np.roll(traj.rewards, 1)]), 0 , 2)
+            # traj_discounts = np.ones((info.num_steps,2))
+            
+
+            # traj_obs = tf.constant(traj_obs, dtype=tf.float32)
+            # traj_actions = tf.constant(traj_actions, dtype=tf.int32)
+            # policy_info = ()
+            # traj_rewards = tf.constant(traj_rewards, dtype=tf.float32)
+            # traj_discounts = tf.constant(traj_discounts, dtype=tf.float32)
+
+            # traj = trajectory.boundary(traj_obs, traj_actions, policy_info, traj_rewards, traj_discounts)
+            # train_loss = tf_agent.train(traj)
         
-        tf_agent._q_network.save_weights("cartpole_model.h5")
+        # tf_agent._q_network.save_weights("cartpole_model.h5")

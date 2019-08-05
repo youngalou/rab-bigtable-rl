@@ -18,6 +18,9 @@ from tf_agents.trajectories import trajectory
 from tf_agents.utils import common
 from tf_agents.replay_buffers import py_uniform_replay_buffer
 
+SCOPES = ['https://www.googleapis.com/auth/bigtable.admin']
+SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
+
 #MODEL HYPERPARAMETERS
 fc_layer_params = (200,)
 learning_rate = 1e-3
@@ -67,7 +70,8 @@ if __name__ == '__main__':
 
     #LOAD/CREATE CBT TABLE
     print('Looking for the [{}] table.'.format(args.cbt_table_name))
-    client = bigtable.Client(args.gcp_project_id, admin=True)
+    credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    client = bigtable.Client(args.gcp_project_id, admin=True, credentials=credentials)
     instance = client.instance(args.cbt_instance_id)
     table = instance.table(args.cbt_table_name)
     if not table.exists():

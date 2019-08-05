@@ -5,3 +5,4 @@ models
 *.h5
 get-pip.py
 *.json
+__pycache__
