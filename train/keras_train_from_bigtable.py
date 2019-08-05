@@ -5,6 +5,7 @@ from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
 
+from google.oauth2 import service_account
 from google.cloud import bigtable
 from google.cloud.bigtable import row_filters
 
@@ -19,7 +20,7 @@ fc_layer_params = (200,)
 learning_rate = 1e-3
 
 #ENV PARAMETERS
-gamma = 1.0 
+gamma = 1.0
 epsilon = 0.1
 max_nb_actions = 2
 min_array_obs = [-4.8000002e+00, -3.4028234663852886e+38, -4.1887903e-01, -3.4028234663852886e+38]
@@ -70,11 +71,15 @@ if __name__ == '__main__':
             traj_shape = np.append(np.array(info.num_steps), np.array(info.vector_obs_spec))
             obs = np.array(traj.vector_obs).reshape(traj_shape)
             next_obs = np.roll(obs, 1)
-            input()
 
             with tf.GradientTape() as tape:
                 q_pred = model(obs)
+                print(q_pred)
+                q_pred = [q[a] for q, a in zip(q_pred, traj.actions)]
+                print(q_pred)
+                input()
                 q_next = model(next_obs)
+                q_next = [tf.argmax(q) for q in q_next]
                 np.apply_along_axis(np.argmax())
                 q_target = traj.rewards + model(next_obs)
 

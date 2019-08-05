@@ -5,6 +5,7 @@ from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
 
+from google.oauth2 import service_account
 from google.cloud import bigtable
 from google.cloud.bigtable import row_filters
 from protobuf.experience_replay_pb2 import Trajectory, Info
