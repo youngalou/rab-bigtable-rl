@@ -14,7 +14,7 @@ from train.dqn_model import DQN_Model
 
 import gym
 
-SCOPES = ['https://www.googleapis.com/auth/bigtable.admin']
+SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 VISUAL_OBS_SPEC = [84, 84, 3]

@@ -5,10 +5,13 @@ from tensorflow.keras import layers
 class DQN_Model(tf.keras.models.Model):
     def __init__(self,
                  num_actions=None,
-                 fc_layer_params=None):
+                 fc_layer_params=None,
+                 learning_rate=0.00042):
         super().__init__()
         self.fc_layers = [layers.Dense(neurons, activation="relu", name="fc_layer_{}".format(i)) for i,(neurons) in enumerate(fc_layer_params)]
         self.q_layer = layers.Dense(num_actions, name='output')
+
+        self.opt = tf.optimizers.Adam(learning_rate)
 
     def call(self, inputs):
         for layer in self.fc_layers:

@@ -19,7 +19,7 @@ from tf_agents.trajectories import trajectory
 from tf_agents.utils import common
 from tf_agents.replay_buffers import py_uniform_replay_buffer
 
-SCOPES = ['https://www.googleapis.com/auth/bigtable.admin']
+SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 #MODEL HYPERPARAMETERS
