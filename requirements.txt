@@ -4,5 +4,6 @@ tensorflow==2.0.0-beta1
 numpy==1.14.5
 protobuf
 gym
-google-cloud-bigtable
 tqdm
+google-cloud-bigtable
+google-cloud-storage
