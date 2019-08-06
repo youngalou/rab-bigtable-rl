@@ -1,24 +1,23 @@
 import os
 import argparse
-import datetime
 from tqdm import tqdm
 
 import numpy as np
 import tensorflow as tf
 
 from google.oauth2 import service_account
-from google.cloud import bigtable
 from google.cloud.bigtable import row_filters
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
 from train.dqn_model import DQN_Model
+from train.gcp_io import cbt_load_table, gcs_load_weights, gcs_save_model
 
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 #ENV PARAMETERS
+VECTOR_OBS_SPEC = [4]
 GAMMA = 0.9
-EPSILON = 0.1
 max_nb_actions = 2
 min_array_obs = [-4.8000002e+00, -3.4028234663852886e+38, -4.1887903e-01, -3.4028234663852886e+38]
 max_array_obs = [4.8000002e+00, 3.4028234663852886e+38, 4.1887903e-01, 3.4028234663852886e+38]
@@ -29,41 +28,37 @@ if __name__ == '__main__':
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
     parser.add_argument('--cbt-table-name', type=str, default='cartpole-experience-replay')
-    parser.add_argument('--restore', type=str, default=None)
+    parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
+    parser.add_argument('--model-prefix', type=str, default='cartpole_model')
+    parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--train-steps', type=int, default=10000)
     parser.add_argument('--period', type=int, default=100)
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     args = parser.parse_args()
 
-    #LOAD/RESTORE MODEL
-    model = DQN_Model(num_actions=2,
+    #INSTANTIATE CBT TABLE AND LOAD MODEL FROM GCS
+    credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+    table = cbt_load_table(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, credentials)
+    bucket, model_found = gcs_load_weights(args.gcp_project_id, args.bucket_id, credentials, args.model_prefix, args.tmp_weights_filepath)
+
+    #LOAD MODEL
+    model = DQN_Model(input_shape=VECTOR_OBS_SPEC,
+                      num_actions=2,
                       fc_layer_params=(200,),
                       learning_rate=.00042)
-    if args.restore:
-        model.load_weights(args.restore)
-
-    #LOAD/CREATE CBT TABLE
-    print("Looking for the [{}] table.".format(args.cbt_table_name))
-    credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-    client = bigtable.Client(args.gcp_project_id, admin=True, credentials=credentials)
-    instance = client.instance(args.cbt_instance_id)
-    table = instance.table(args.cbt_table_name)
-    if not table.exists():
-        print("Table doesn't exist.")
-        exit()
-    else:
-        print("Table found.")
-
-    os.makedirs(os.path.dirname(os.path.join(args.output_dir, 'models/')), exist_ok=True)
-    os.makedirs(os.path.dirname(os.path.join(args.output_dir, 'logs/')), exist_ok=True)
+    if model_found:
+        model.load_weights(args.tmp_weights_filepath)
 
     #SETUP TENSORBOARD/METRICS
+    os.makedirs(os.path.dirname(os.path.join(args.output_dir, 'models/')), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.join(args.output_dir, 'logs/')), exist_ok=True)
     loss_metrics = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
     train_log_dir =  os.path.join(args.output_dir, "logs/")
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     os.makedirs(os.path.dirname(args.output_dir), exist_ok=True)
 
     #TRAINING LOOP
+    print("-> Starting training...")
     for i in tqdm(range(5000), "Training"):
         #QUERY TABLE FOR PARTIAL ROWS
         regex_filter = '^cartpole_trajectory_{}$'.format(i)
@@ -105,8 +100,6 @@ if __name__ == '__main__':
 
         #SAVE MODEL WEIGHTS
         if i > 0 and i % args.period == 0:
-            output_filepath = os.path.join(args.output_dir, 'models/', 'cartpole_model_{}.h5'.format(i))
-            model.save_weights(output_filepath)
-            print("Saved model to [{}].".format(output_filepath))
-            # model_json = model.to_json()
-            # print(model_json)
+            model_filename = args.model_prefix + '_{}.h5'.format(i)
+            gcs_save_model(model, bucket, args.tmp_weights_filepath, model_filename)
+    print("-> Done!")

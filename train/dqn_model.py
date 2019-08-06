@@ -4,6 +4,7 @@ from tensorflow.keras import layers
 
 class DQN_Model(tf.keras.models.Model):
     def __init__(self,
+                 input_shape=None,
                  num_actions=None,
                  fc_layer_params=None,
                  learning_rate=0.00042):
@@ -12,6 +13,8 @@ class DQN_Model(tf.keras.models.Model):
         self.q_layer = layers.Dense(num_actions, name='output')
 
         self.opt = tf.optimizers.Adam(learning_rate)
+
+        self.step(np.zeros(input_shape))
 
     def call(self, inputs):
         for layer in self.fc_layers:
