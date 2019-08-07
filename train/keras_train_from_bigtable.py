@@ -63,7 +63,9 @@ if __name__ == '__main__':
             row_key_i = global_i - args.train_steps + i
             row_key = args.prefix + '_trajectory_' + str(row_key_i)
             row = cbt_table.read_row(row_key)
-
+            if row is None:
+                print("Row_key [{}] not found.")
+                exit()
             bytes_traj = row.cells['trajectory']['traj'.encode()][0].value
             bytes_info = row.cells['trajectory']['info'.encode()][0].value
             traj, info = Trajectory(), Info()
