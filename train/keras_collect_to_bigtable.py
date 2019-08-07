@@ -1,6 +1,8 @@
 import os
 import argparse
 import datetime
+import time
+import struct
 from tqdm import tqdm
 
 import numpy as np
@@ -26,11 +28,12 @@ if __name__ == '__main__':
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
     parser.add_argument('--cbt-table-name', type=str, default='cartpole-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
-    parser.add_argument('--model-prefix', type=str, default='cartpole_model')
+    parser.add_argument('--prefix', type=str, default='cartpole')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
-    parser.add_argument('--num-episodes', type=int, default=5000000)
+    parser.add_argument('--num-cycles', type=int, default=1000000)
+    parser.add_argument('--num-episodes', type=int, default=1000)
     parser.add_argument('--max-steps', type=int, default=100)
-    parser.add_argument('--update-interval', type=int, default=5000)
+    parser.add_argument('--update-interval', type=int, default=1000)
     args = parser.parse_args()
 
     #INSTANTIATE CBT TABLE AND GCS BUCKET
@@ -48,51 +51,70 @@ if __name__ == '__main__':
     env = gym.make('CartPole-v0')
     print("-> Environment intialized.")
 
+    #GLOBAL ITERATOR
+    gi_row = cbt_table.read_row('global_iterator'.encode())
+    if gi_row is not None:
+        global_i = gi_row.cells['global']['i'.encode()][0].value
+        global_i = struct.unpack('i', global_i)[0]
+    else:
+        gi_row = cbt_table.row('global_iterator'.encode())
+        gi_row.set_cell(column_family_id='global',
+                        column='i'.encode(),
+                        value=struct.pack('i',0),
+                        timestamp=datetime.datetime.utcnow())
+        cbt_table.mutate_rows([gi_row])
+        global_i = 0
+    print("global_i = {}".format(global_i))
+
     #COLLECT DATA FOR CBT
     print("-> Starting data collection...")
     rows = []
-    for i in tqdm(range(args.num_episodes), "Generating trajectories"):
-        if i % args.update_interval == 0:
-            gcs_load_weights(model, gcs_bucket, args.model_prefix, args.tmp_weights_filepath)
-        #RL LOOP GENERATES A TRAJECTORY
-        observations, actions, rewards = [], [], []
-        obs = np.array(env.reset())
-        reward = 0
-        done = False
-        
-        for _ in range(args.max_steps):
-            action = model.step(obs)
-            new_obs, reward, done, info = env.step(action)
+    for cycle in range(args.num_cycles):
+        gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
+        for i in tqdm(range(args.num_episodes), "Cycle {}".format(cycle)):
+            #RL LOOP GENERATES A TRAJECTORY
+            observations, actions, rewards = [], [], []
+            obs = np.array(env.reset())
+            reward = 0
+            done = False
+            
+            for _ in range(args.max_steps):
+                action = model.step(obs)
+                new_obs, reward, done, info = env.step(action)
 
-            observations.append(obs)
-            actions.append(action)
-            rewards.append(reward)
+                observations.append(obs)
+                actions.append(action)
+                rewards.append(reward)
 
-            if done: break
-            obs = np.array(new_obs)
+                if done: break
+                obs = np.array(new_obs)
 
-        #BUILD PB2 OBJECTS
-        traj, info = Trajectory(), Info()
-        traj.vector_obs.extend(np.array(observations).flatten())
-        traj.actions.extend(actions)
-        traj.rewards.extend(rewards)
-        info.vector_obs_spec.extend(observations[0].shape)
-        info.num_steps = len(actions)
+            #BUILD PB2 OBJECTS
+            traj, info = Trajectory(), Info()
+            traj.vector_obs.extend(np.array(observations).flatten())
+            traj.actions.extend(actions)
+            traj.rewards.extend(rewards)
+            info.vector_obs_spec.extend(observations[0].shape)
+            info.num_steps = len(actions)
 
-        #WRITE TO AND APPEND ROW
-        row_key = "cartpole_trajectory_{}".format(i).encode()
-        row = cbt_table.row(row_key)
-        row.set_cell(column_family_id='trajectory',
+            #WRITE TO AND APPEND ROW
+            row_key_i = i + global_i + (cycle * args.num_episodes)
+            row_key = '{}_trajectory_{}'.format(args.prefix,row_key_i).encode()
+            row = cbt_table.row(row_key)
+            row.set_cell(column_family_id='trajectory',
                         column='traj'.encode(),
-                        value=traj.SerializeToString(),
-                        timestamp=datetime.datetime.utcnow())
-        row.set_cell(column_family_id='trajectory',
+                        value=traj.SerializeToString())
+            row.set_cell(column_family_id='trajectory',
                         column='info'.encode(),
-                        value=info.SerializeToString(),
+                        value=info.SerializeToString())
+            rows.append(row)
+        gi_row = cbt_table.row('global_iterator'.encode())
+        gi_row.set_cell(column_family_id='global',
+                        column='i'.encode(),
+                        value=struct.pack('i',i+global_i),
                         timestamp=datetime.datetime.utcnow())
-        rows.append(row)
-        if i > 0 and i % args.update_interval == 0:
-            cbt_table.mutate_rows(rows)
-            rows = []
+        rows.append(gi_row)
+        cbt_table.mutate_rows(rows)
+        rows = []
     env.close()
     print("-> Done!")

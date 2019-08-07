@@ -1,16 +1,17 @@
 import os
 import argparse
+import datetime
+import time
 from tqdm import tqdm
 
 import numpy as np
 import tensorflow as tf
 
 from google.oauth2 import service_account
-from google.cloud.bigtable import row_filters
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
 from train.dqn_model import DQN_Model
-from train.gcp_io import gcp_load_pipeline, gcs_load_weights, gcs_save_weights
+from train.gcp_io import gcp_load_pipeline, gcs_load_weights, gcs_save_weights, cbt_global_iterator
 
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
@@ -23,16 +24,15 @@ max_array_obs = [4.8000002e+00, 3.4028234663852886e+38, 4.1887903e-01, 3.4028234
 
 if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
-    parser = argparse.ArgumentParser('Read-From-Bigtable Script')
+    parser = argparse.ArgumentParser('Train-From-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
     parser.add_argument('--cbt-table-name', type=str, default='cartpole-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
-    parser.add_argument('--model-prefix', type=str, default='cartpole_model')
+    parser.add_argument('--prefix', type=str, default='cartpole')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
-    parser.add_argument('--train-epochs', type=int, default=100000)
-    parser.add_argument('--train-steps', type=int, default=100000)
-    parser.add_argument('--period', type=int, default=1000)
+    parser.add_argument('--train-epochs', type=int, default=1000000)
+    parser.add_argument('--train-steps', type=int, default=1000)
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     args = parser.parse_args()
 
@@ -45,7 +45,7 @@ if __name__ == '__main__':
                       num_actions=2,
                       fc_layer_params=(200,),
                       learning_rate=.00042)
-    gcs_load_weights(model, gcs_bucket, args.model_prefix, args.tmp_weights_filepath)
+    gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
 
     #SETUP TENSORBOARD/METRICS
     os.makedirs(os.path.dirname(os.path.join(args.output_dir, 'models/')), exist_ok=True)
@@ -57,15 +57,13 @@ if __name__ == '__main__':
 
     #TRAINING LOOP
     print("-> Starting training...")
-    for i in tqdm(range(args.train_epochs), "Training"):
-        #QUERY TABLE FOR PARTIAL ROWS
-        # regex_filter = '^cartpole_trajectory_{}$'.format(i)
-        # row_filter = row_filters.RowKeyRegexFilter(regex_filter)
-        row_filter = row_filters.CellsColumnLimitFilter(args.train_steps)
-        filtered_rows = cbt_table.read_rows(filter_=row_filter)
+    for epoch in range(args.train_epochs):
+        global_i = cbt_global_iterator(cbt_table)
+        for i in tqdm(range(args.train_steps), "Trajectories {} - {}".format(global_i - args.train_steps, global_i)):
+            row_key_i = global_i - args.train_steps + i
+            row_key = args.prefix + '_trajectory_' + str(row_key_i)
+            row = cbt_table.read_row(row_key)
 
-        for row in filtered_rows:
-            #PARSE ROWS
             bytes_traj = row.cells['trajectory']['traj'.encode()][0].value
             bytes_info = row.cells['trajectory']['info'.encode()][0].value
             traj, info = Trajectory(), Info()
@@ -95,10 +93,9 @@ if __name__ == '__main__':
             #TENSORBOARD LOGGING
             loss_metrics(loss)
             with train_summary_writer.as_default():
-                tf.summary.scalar('loss', loss_metrics.result(), step=i)
+                tf.summary.scalar('loss', loss_metrics.result(), step=epoch)
 
         #SAVE MODEL WEIGHTS
-        if i > 0 and i % args.period == 0:
-            model_filename = args.model_prefix + '_{}.h5'.format(i)
-            gcs_save_weights(model, gcs_bucket, args.tmp_weights_filepath, model_filename)
+        model_filename = args.prefix + '_model.h5'.format(epoch)
+        gcs_save_weights(model, gcs_bucket, args.tmp_weights_filepath, model_filename)
     print("-> Done!")

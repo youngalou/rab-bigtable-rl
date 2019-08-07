@@ -1,6 +1,16 @@
+import struct
+
 from google.oauth2 import service_account
-from google.cloud import bigtable
 from google.cloud import storage
+from google.cloud import bigtable
+from google.cloud.bigtable import row_filters
+
+def gcs_load_bucket(gcp_project_id, bucket_id, credentials):
+    print('-> Looking for the [{}] bucket.'.format(bucket_id))
+    storage_client = storage.Client(gcp_project_id, credentials=credentials)
+    gcs_bucket = storage_client.get_bucket(bucket_id)
+    print('-> Bucket found.')
+    return gcs_bucket
 
 def cbt_load_table(gcp_project_id, cbt_instance_id, cbt_table_name, credentials):
     print('-> Looking for the [{}] table.'.format(cbt_table_name))
@@ -10,7 +20,7 @@ def cbt_load_table(gcp_project_id, cbt_instance_id, cbt_table_name, credentials)
     if not cbt_table.exists():
         print("-> Table doesn't exist. Creating [{}] table...".format(cbt_table_name))
         max_versions_rule = bigtable.column_family.MaxVersionsGCRule(1)
-        column_families = {'trajectory': max_versions_rule}
+        column_families = {'trajectory': max_versions_rule, 'global': max_versions_rule}
         cbt_table.create(column_families=column_families)
         print('-> Table created. Give it ~60 seconds to initialize before loading data.')
         exit()
@@ -18,19 +28,13 @@ def cbt_load_table(gcp_project_id, cbt_instance_id, cbt_table_name, credentials)
         print("-> Table found.")
     return cbt_table
 
-def gcs_load_bucket(gcp_project_id, bucket_id, credentials):
-    print('-> Looking for the [{}] bucket.'.format(bucket_id))
-    storage_client = storage.Client(gcp_project_id, credentials=credentials)
-    gcs_bucket = storage_client.get_bucket(bucket_id)
-    print('-> Bucket found.')
-    return gcs_bucket
-
 def gcp_load_pipeline(gcp_project_id, cbt_instance_id, cbt_table_name, bucket_id, credentials):
     cbt_table = cbt_load_table(gcp_project_id, cbt_instance_id, cbt_table_name, credentials)
     gcs_bucket = gcs_load_bucket(gcp_project_id, bucket_id, credentials)
     return cbt_table, gcs_bucket
 
-def gcs_load_weights(model, bucket, model_prefix, tmp_weights_filepath):
+def gcs_load_weights(model, bucket, prefix, tmp_weights_filepath):
+    model_prefix = prefix + '_model'
     blobs_list = bucket.list_blobs(max_results=10, prefix=model_prefix)
     newest_blob = None
     for i,blob in enumerate(blobs_list):
@@ -51,3 +55,13 @@ def gcs_save_weights(model, bucket, tmp_weights_filepath, model_filename):
     blob = bucket.blob(model_filename)
     blob.upload_from_filename(tmp_weights_filepath)
     print("-> Saved model to bucket as [{}].".format(model_filename))
+
+def cbt_global_iterator(cbt_table):
+    row_filter = row_filters.CellsColumnLimitFilter(1)
+    gi_row = cbt_table.read_row('global_iterator'.encode())
+    if gi_row is None:
+        print("Table exists, but contains no rows.")
+        exit()
+    global_i = gi_row.cells['global']['i'.encode()][0].value
+    global_i = struct.unpack('i', global_i)[0]
+    return global_i
