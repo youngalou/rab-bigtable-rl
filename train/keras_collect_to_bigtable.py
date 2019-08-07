@@ -10,7 +10,7 @@ from google.oauth2 import service_account
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
 from train.dqn_model import DQN_Model
-from train.gcp_io import cbt_load_table, gcs_load_weights
+from train.gcp_io import gcp_load_pipeline, gcs_load_weights
 
 import gym
 
@@ -28,22 +28,20 @@ if __name__ == '__main__':
     parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
     parser.add_argument('--model-prefix', type=str, default='cartpole_model')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
-    parser.add_argument('--num-episodes', type=int, default=5000)
+    parser.add_argument('--num-episodes', type=int, default=5000000)
     parser.add_argument('--max-steps', type=int, default=100)
+    parser.add_argument('--update-interval', type=int, default=5000)
     args = parser.parse_args()
 
-    #INSTANTIATE CBT TABLE AND LOAD WEIGHTS FROM GCS
+    #INSTANTIATE CBT TABLE AND GCS BUCKET
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-    table = cbt_load_table(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, credentials)
-    bucket, model_found = gcs_load_weights(args.gcp_project_id, args.bucket_id, credentials, args.model_prefix, args.tmp_weights_filepath)
+    cbt_table, gcs_bucket = gcp_load_pipeline(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, args.bucket_id, credentials)
 
     #LOAD MODEL
     model = DQN_Model(input_shape=VECTOR_OBS_SPEC,
                       num_actions=2,
                       fc_layer_params=(200,),
                       learning_rate=.00042)
-    if model_found:
-        model.load_weights(args.tmp_weights_filepath)
 
     #INITIALIZE ENVIRONMENT
     print("-> Initializing Gym environement...")
@@ -54,6 +52,8 @@ if __name__ == '__main__':
     print("-> Starting data collection...")
     rows = []
     for i in tqdm(range(args.num_episodes), "Generating trajectories"):
+        if i % args.update_interval == 0:
+            gcs_load_weights(model, gcs_bucket, args.model_prefix, args.tmp_weights_filepath)
         #RL LOOP GENERATES A TRAJECTORY
         observations, actions, rewards = [], [], []
         obs = np.array(env.reset())
@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
         #WRITE TO AND APPEND ROW
         row_key = "cartpole_trajectory_{}".format(i).encode()
-        row = table.row(row_key)
+        row = cbt_table.row(row_key)
         row.set_cell(column_family_id='trajectory',
                         column='traj'.encode(),
                         value=traj.SerializeToString(),
@@ -91,6 +91,8 @@ if __name__ == '__main__':
                         value=info.SerializeToString(),
                         timestamp=datetime.datetime.utcnow())
         rows.append(row)
-    table.mutate_rows(rows)
+        if i > 0 and i % args.update_interval == 0:
+            cbt_table.mutate_rows(rows)
+            rows = []
     env.close()
     print("-> Done!")

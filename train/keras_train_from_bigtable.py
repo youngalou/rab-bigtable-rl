@@ -10,12 +10,11 @@ from google.cloud.bigtable import row_filters
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
 from train.dqn_model import DQN_Model
-from train.gcp_io import cbt_load_table, gcs_load_weights, gcs_save_model
+from train.gcp_io import gcp_load_pipeline, gcs_load_weights, gcs_save_weights
 
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
-#ENV PARAMETERS
 VECTOR_OBS_SPEC = [4]
 GAMMA = 0.9
 max_nb_actions = 2
@@ -36,18 +35,16 @@ if __name__ == '__main__':
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     args = parser.parse_args()
 
-    #INSTANTIATE CBT TABLE AND LOAD MODEL FROM GCS
+    #INSTANTIATE CBT TABLE AND GCS BUCKET
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-    table = cbt_load_table(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, credentials)
-    bucket, model_found = gcs_load_weights(args.gcp_project_id, args.bucket_id, credentials, args.model_prefix, args.tmp_weights_filepath)
+    cbt_table, gcs_bucket = gcp_load_pipeline(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, args.bucket_id, credentials)
 
     #LOAD MODEL
     model = DQN_Model(input_shape=VECTOR_OBS_SPEC,
                       num_actions=2,
                       fc_layer_params=(200,),
                       learning_rate=.00042)
-    if model_found:
-        model.load_weights(args.tmp_weights_filepath)
+    gcs_load_weights(model, gcs_bucket, args.model_prefix, args.tmp_weights_filepath)
 
     #SETUP TENSORBOARD/METRICS
     os.makedirs(os.path.dirname(os.path.join(args.output_dir, 'models/')), exist_ok=True)
@@ -63,7 +60,7 @@ if __name__ == '__main__':
         #QUERY TABLE FOR PARTIAL ROWS
         regex_filter = '^cartpole_trajectory_{}$'.format(i)
         row_filter = row_filters.RowKeyRegexFilter(regex_filter)
-        filtered_rows = table.read_rows(filter_=row_filter)
+        filtered_rows = cbt_table.read_rows(filter_=row_filter)
 
         for row in filtered_rows:
             #PARSE ROWS
@@ -101,5 +98,5 @@ if __name__ == '__main__':
         #SAVE MODEL WEIGHTS
         if i > 0 and i % args.period == 0:
             model_filename = args.model_prefix + '_{}.h5'.format(i)
-            gcs_save_model(model, bucket, args.tmp_weights_filepath, model_filename)
+            gcs_save_weights(model, gcs_bucket, args.tmp_weights_filepath, model_filename)
     print("-> Done!")

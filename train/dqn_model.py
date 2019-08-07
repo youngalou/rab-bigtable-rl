@@ -12,9 +12,10 @@ class DQN_Model(tf.keras.models.Model):
         self.fc_layers = [layers.Dense(neurons, activation="relu", name="fc_layer_{}".format(i)) for i,(neurons) in enumerate(fc_layer_params)]
         self.q_layer = layers.Dense(num_actions, name='output')
 
+        self.step(np.zeros(input_shape))
         self.opt = tf.optimizers.Adam(learning_rate)
 
-        self.step(np.zeros(input_shape))
+        self.public_url = None
 
     def call(self, inputs):
         for layer in self.fc_layers:
