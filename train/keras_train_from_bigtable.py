@@ -30,6 +30,7 @@ if __name__ == '__main__':
     parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
     parser.add_argument('--model-prefix', type=str, default='cartpole_model')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
+    parser.add_argument('--train-epochs', type=int, default=100000)
     parser.add_argument('--train-steps', type=int, default=100000)
     parser.add_argument('--period', type=int, default=1000)
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
@@ -56,10 +57,11 @@ if __name__ == '__main__':
 
     #TRAINING LOOP
     print("-> Starting training...")
-    for i in tqdm(range(args.train_steps), "Training"):
+    for i in tqdm(range(args.train_epochs), "Training"):
         #QUERY TABLE FOR PARTIAL ROWS
-        regex_filter = '^cartpole_trajectory_{}$'.format(i)
-        row_filter = row_filters.RowKeyRegexFilter(regex_filter)
+        # regex_filter = '^cartpole_trajectory_{}$'.format(i)
+        # row_filter = row_filters.RowKeyRegexFilter(regex_filter)
+        row_filter = row_filters.CellsColumnLimitFilter(args.train_steps)
         filtered_rows = cbt_table.read_rows(filter_=row_filter)
 
         for row in filtered_rows:
