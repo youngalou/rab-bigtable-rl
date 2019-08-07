@@ -12,7 +12,7 @@ from google.oauth2 import service_account
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
 from train.dqn_model import DQN_Model
-from train.gcp_io import gcp_load_pipeline, gcs_load_weights
+from train.gcp_io import gcp_load_pipeline, gcs_load_weights, cbt_global_iterator
 
 import gym
 
@@ -52,18 +52,7 @@ if __name__ == '__main__':
     print("-> Environment intialized.")
 
     #GLOBAL ITERATOR
-    gi_row = cbt_table.read_row('global_iterator'.encode())
-    if gi_row is not None:
-        global_i = gi_row.cells['global']['i'.encode()][0].value
-        global_i = struct.unpack('i', global_i)[0]
-    else:
-        gi_row = cbt_table.row('global_iterator'.encode())
-        gi_row.set_cell(column_family_id='global',
-                        column='i'.encode(),
-                        value=struct.pack('i',0),
-                        timestamp=datetime.datetime.utcnow())
-        cbt_table.mutate_rows([gi_row])
-        global_i = 0
+    global_i = cbt_global_iterator(cbt_table)
     print("global_i = {}".format(global_i))
 
     #COLLECT DATA FOR CBT
@@ -111,10 +100,11 @@ if __name__ == '__main__':
         gi_row = cbt_table.row('global_iterator'.encode())
         gi_row.set_cell(column_family_id='global',
                         column='i'.encode(),
-                        value=struct.pack('i',i+global_i),
+                        value=struct.pack('i',row_key_i+1),
                         timestamp=datetime.datetime.utcnow())
         rows.append(gi_row)
         cbt_table.mutate_rows(rows)
         rows = []
+        print("-> Saved trajectories {} - {}.".format(row_key_i - args.num_episodes, row_key_i))
     env.close()
     print("-> Done!")

@@ -1,4 +1,5 @@
 import struct
+import datetime
 
 from google.oauth2 import service_account
 from google.cloud import storage
@@ -42,7 +43,7 @@ def gcs_load_weights(model, bucket, prefix, tmp_weights_filepath):
         elif blob.time_created > newest_blob.time_created:
             newest_blob = blob
     if newest_blob is not None:
-        if model.public_url == newest_blob.public_url: return
+        # if model.public_url == newest_blob.public_url: return
         newest_blob.download_to_filename(tmp_weights_filepath)
         model.load_weights(tmp_weights_filepath)
         model.public_url = newest_blob.public_url
@@ -59,9 +60,15 @@ def gcs_save_weights(model, bucket, tmp_weights_filepath, model_filename):
 def cbt_global_iterator(cbt_table):
     row_filter = row_filters.CellsColumnLimitFilter(1)
     gi_row = cbt_table.read_row('global_iterator'.encode())
-    if gi_row is None:
-        print("Table exists, but contains no rows.")
-        exit()
-    global_i = gi_row.cells['global']['i'.encode()][0].value
-    global_i = struct.unpack('i', global_i)[0]
+    if gi_row is not None:
+        global_i = gi_row.cells['global']['i'.encode()][0].value
+        global_i = struct.unpack('i', global_i)[0]
+    else:
+        gi_row = cbt_table.row('global_iterator'.encode())
+        gi_row.set_cell(column_family_id='global',
+                        column='i'.encode(),
+                        value=struct.pack('i',0),
+                        timestamp=datetime.datetime.utcnow())
+        cbt_table.mutate_rows([gi_row])
+        global_i = 0  
     return global_i
