@@ -20,11 +20,17 @@ class DQN_Model(tf.keras.models.Model):
     def call(self, inputs):
         for layer in self.fc_layers:
             inputs = layer(inputs)
-        q_values = self.q_layer(inputs)
-        return tf.squeeze(q_values)
+        logits = self.q_layer(inputs)
+        return logits
     
     def step(self, inputs):
         inputs = np.expand_dims(inputs, 0)
-        q_values = self(inputs)
+        q_values = tf.squeeze(self(inputs))
         action = tf.argmax(q_values).numpy()
+        return action
+
+    def stochastic_step(self, inputs):
+        inputs = np.expand_dims(inputs, 0)
+        logits = self(inputs)
+        action = tf.squeeze(tf.random.categorical(logits, 1)).numpy()
         return action

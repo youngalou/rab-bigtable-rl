@@ -67,7 +67,7 @@ if __name__ == '__main__':
             done = False
             
             for _ in range(args.max_steps):
-                action = model.step(obs)
+                action = model.stochastic_step(obs)
                 new_obs, reward, done, info = env.step(action)
 
                 observations.append(obs)
