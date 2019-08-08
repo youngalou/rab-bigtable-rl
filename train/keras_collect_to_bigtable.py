@@ -19,7 +19,7 @@ import gym
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
-#MODEL HYPERPARAMETERS
+#SET HYPERPARAMETERS
 VECTOR_OBS_SPEC = [4]
 NUM_ACTIONS=2
 FC_LAYER_PARAMS=(200,)

@@ -16,14 +16,12 @@ from train.gcp_io import gcp_load_pipeline, gcs_load_weights, gcs_save_weights, 
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
-#MODEL HYPERPARAMETERS
+#SET HYPERPARAMETERS
 VECTOR_OBS_SPEC = [4]
 NUM_ACTIONS=2
 FC_LAYER_PARAMS=(200,)
 LEARNING_RATE=0.00042
-#TRAINING HYPERPARAMETERS
 GAMMA = 0.9
-EPSILON = 0.5
 
 if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS

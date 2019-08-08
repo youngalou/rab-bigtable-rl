@@ -38,6 +38,6 @@ class DQN_Model(tf.keras.models.Model):
 
     def step_epsilon_greedy(self, inputs, epsilon):
         sample = np.random.random()
-        if sample > epsilon:
+        if sample > 1 - epsilon:
             return np.random.randint(self.num_actions)
         return self.step(inputs)
