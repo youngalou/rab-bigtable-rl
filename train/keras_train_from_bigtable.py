@@ -32,7 +32,8 @@ if __name__ == '__main__':
     parser.add_argument('--prefix', type=str, default='cartpole')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--train-epochs', type=int, default=1000000)
-    parser.add_argument('--train-steps', type=int, default=1000)
+    parser.add_argument('--train-steps', type=int, default=100)
+    parser.add_argument('--period', type=int, default=100)
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     args = parser.parse_args()
 
@@ -48,12 +49,10 @@ if __name__ == '__main__':
     gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
 
     #SETUP TENSORBOARD/METRICS
-    os.makedirs(os.path.dirname(os.path.join(args.output_dir, 'models/')), exist_ok=True)
-    os.makedirs(os.path.dirname(os.path.join(args.output_dir, 'logs/')), exist_ok=True)
+    train_log_dir = os.path.join(args.output_dir, 'logs/')
+    os.makedirs(os.path.dirname(train_log_dir), exist_ok=True)
     loss_metrics = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
-    train_log_dir =  os.path.join(args.output_dir, "logs/")
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
-    os.makedirs(os.path.dirname(args.output_dir), exist_ok=True)
 
     #TRAINING LOOP
     print("-> Starting training...")
@@ -94,10 +93,12 @@ if __name__ == '__main__':
 
             #TENSORBOARD LOGGING
             loss_metrics(loss)
+            total_reward = np.sum(traj.rewards)
             with train_summary_writer.as_default():
-                tf.summary.scalar('loss', loss_metrics.result(), step=epoch)
+                tf.summary.scalar('loss', loss_metrics.result(), step=i+(epoch*args.train_steps))
+                tf.summary.scalar('total reward', total_reward, step=i+(epoch*args.train_steps))
 
         #SAVE MODEL WEIGHTS
-        model_filename = args.prefix + '_model.h5'.format(epoch)
+        model_filename = args.prefix + '_model.h5'
         gcs_save_weights(model, gcs_bucket, args.tmp_weights_filepath, model_filename)
     print("-> Done!")
