@@ -15,6 +15,7 @@ class DQN_Model(tf.keras.models.Model):
         self.step(np.zeros(input_shape))
         self.opt = tf.optimizers.Adam(learning_rate)
 
+        self.num_actions = num_actions
         self.public_url = None
 
     def call(self, inputs):
@@ -29,8 +30,14 @@ class DQN_Model(tf.keras.models.Model):
         action = tf.argmax(q_values).numpy()
         return action
 
-    def stochastic_step(self, inputs):
+    def step_stochastic(self, inputs):
         inputs = np.expand_dims(inputs, 0)
         logits = self(inputs)
         action = tf.squeeze(tf.random.categorical(logits, 1)).numpy()
         return action
+
+    def step_epsilon_greedy(self, inputs, epsilon):
+        sample = np.random.random()
+        if sample > epsilon:
+            return np.random.randint(self.num_actions)
+        return self.step(inputs)

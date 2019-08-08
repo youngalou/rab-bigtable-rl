@@ -19,7 +19,12 @@ import gym
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
+#MODEL HYPERPARAMETERS
 VECTOR_OBS_SPEC = [4]
+NUM_ACTIONS=2
+FC_LAYER_PARAMS=(200,)
+LEARNING_RATE=0.00042
+EPSILON = 0.5
 
 if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
@@ -41,9 +46,9 @@ if __name__ == '__main__':
 
     #LOAD MODEL
     model = DQN_Model(input_shape=VECTOR_OBS_SPEC,
-                      num_actions=2,
-                      fc_layer_params=(200,),
-                      learning_rate=.00042)
+                      num_actions=NUM_ACTIONS,
+                      fc_layer_params=FC_LAYER_PARAMS,
+                      learning_rate=LEARNING_RATE)
 
     #INITIALIZE ENVIRONMENT
     print("-> Initializing Gym environement...")
@@ -67,7 +72,7 @@ if __name__ == '__main__':
             done = False
             
             for _ in range(args.max_steps):
-                action = model.stochastic_step(obs)
+                action = model.step_epsilon_greedy(obs, EPSILON)
                 new_obs, reward, done, info = env.step(action)
 
                 observations.append(obs)

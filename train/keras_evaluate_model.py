@@ -14,7 +14,12 @@ import gym
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
+#MODEL HYPERPARAMETERS
 VECTOR_OBS_SPEC = [4]
+NUM_ACTIONS=2
+FC_LAYER_PARAMS=(200,)
+LEARNING_RATE=0.00042
+EPSILON = 0.5
 
 if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
@@ -34,9 +39,9 @@ if __name__ == '__main__':
 
     #LOAD MODEL
     model = DQN_Model(input_shape=VECTOR_OBS_SPEC,
-                      num_actions=2,
-                      fc_layer_params=(200,),
-                      learning_rate=.00042)
+                      num_actions=NUM_ACTIONS,
+                      fc_layer_params=FC_LAYER_PARAMS,
+                      learning_rate=LEARNING_RATE)
     gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
 
     #INITIALIZE ENVIRONMENT
