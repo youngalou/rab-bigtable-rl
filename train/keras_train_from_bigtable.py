@@ -75,7 +75,7 @@ if __name__ == '__main__':
             #FORMAT DATA
             traj_shape = np.append(np.array(info.num_steps), np.array(info.vector_obs_spec))
             obs = np.array(traj.vector_obs).reshape(traj_shape)
-            next_obs = np.roll(obs, shift=1, axis=0)
+            next_obs = np.roll(obs, shift=-1, axis=0)
 
             #COMPUTE GRADIENTS
             with tf.GradientTape() as tape:
@@ -83,6 +83,7 @@ if __name__ == '__main__':
                 q_pred = [q[a] for q, a in zip(q_pred, traj.actions)]
                 q_next = model(next_obs)
                 q_next = [tf.argmax(q) for q in q_next]
+                q_next[-1] = 0
                 q_target = traj.rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next)
 
                 mse = tf.keras.losses.MeanSquaredError()
