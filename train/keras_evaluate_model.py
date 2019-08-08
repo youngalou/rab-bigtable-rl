@@ -19,7 +19,6 @@ VECTOR_OBS_SPEC = [4]
 NUM_ACTIONS=2
 FC_LAYER_PARAMS=(200,)
 LEARNING_RATE=0.00042
-EPSILON = 0.5
 
 if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
@@ -28,9 +27,9 @@ if __name__ == '__main__':
     parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
     parser.add_argument('--prefix', type=str, default='cartpole')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
-    parser.add_argument('--num-episodes', type=int, default=100)
+    parser.add_argument('--num-cycles', type=int, default=1000)
+    parser.add_argument('--num-episodes', type=int, default=10)
     parser.add_argument('--max-steps', type=int, default=100)
-    parser.add_argument('--update-interval', type=int, default=100)
     args = parser.parse_args()
 
     #INSTANTIATE CBT TABLE AND GCS BUCKET
@@ -42,7 +41,6 @@ if __name__ == '__main__':
                       num_actions=NUM_ACTIONS,
                       fc_layer_params=FC_LAYER_PARAMS,
                       learning_rate=LEARNING_RATE)
-    gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
 
     #INITIALIZE ENVIRONMENT
     print("-> Initializing Gym environement...")
@@ -51,28 +49,29 @@ if __name__ == '__main__':
 
     #COLLECT DATA FOR CBT
     print("-> Starting evaluation...")
-    for i in tqdm(range(args.num_episodes), "Evaluating"):
-        observations, actions, rewards = [], [], []
-        obs = np.array(env.reset())
-        reward = 0
-        done = False
-        
-        for _ in range(args.max_steps):
-            env.render()
-            time.sleep(.05)
+    for cycle in range(args.num_cycles):
+        gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
+        total_reward = 0
+        for i in tqdm(range(args.num_episodes), "Cycle {}".format(cycle)):
+            observations, actions, rewards = [], [], []
+            obs = np.array(env.reset())
+            reward = 0
+            done = False
+            
+            for _ in range(args.max_steps):
+                env.render()
+                time.sleep(.05)
 
-            action = model.step(obs)
-            new_obs, reward, done, info = env.step(action)
+                action = model.step(obs)
+                new_obs, reward, done, info = env.step(action)
 
-            observations.append(obs)
-            actions.append(action)
-            rewards.append(reward)
+                observations.append(obs)
+                actions.append(action)
+                rewards.append(reward)
 
-            if done: break
-            obs = np.array(new_obs)
-
-        if i > 0 and i % args.update_interval == 0:
-            gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
-
+                total_reward += reward
+                if done: break
+                obs = np.array(new_obs)
+        print("Average reward: {}".format(total_reward / args.num_episodes))
     env.close()
     print("-> Done!")

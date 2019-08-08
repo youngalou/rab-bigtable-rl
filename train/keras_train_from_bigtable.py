@@ -77,7 +77,7 @@ if __name__ == '__main__':
             #FORMAT DATA
             traj_shape = np.append(np.array(info.num_steps), np.array(info.vector_obs_spec))
             obs = np.array(traj.vector_obs).reshape(traj_shape)
-            next_obs = np.roll(obs, 1)
+            next_obs = np.roll(obs, shift=1, axis=0)
 
             #COMPUTE GRADIENTS
             with tf.GradientTape() as tape:
