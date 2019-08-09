@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
             #FORMAT DATA
             traj_shape = np.append(info.num_steps, info.vector_obs_spec)
-            obs = np.array(traj.vector_obs).reshape(traj_shape)
+            obs = np.asarray(traj.vector_obs).reshape(traj_shape)
             next_obs = np.roll(obs, shift=-1, axis=0)
 
             #COMPUTE GRADIENTS
