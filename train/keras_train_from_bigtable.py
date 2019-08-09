@@ -73,7 +73,7 @@ if __name__ == '__main__':
             info.ParseFromString(bytes_info)
 
             #FORMAT DATA
-            traj_shape = np.append(np.array(info.num_steps), np.array(info.vector_obs_spec))
+            traj_shape = np.append(info.num_steps, info.vector_obs_spec)
             obs = np.array(traj.vector_obs).reshape(traj_shape)
             next_obs = np.roll(obs, shift=-1, axis=0)
 

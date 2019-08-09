@@ -67,7 +67,7 @@ if __name__ == '__main__':
         for i in tqdm(range(args.num_episodes), "Cycle {}".format(cycle)):
             #RL LOOP GENERATES A TRAJECTORY
             observations, actions, rewards = [], [], []
-            obs = np.array(env.reset())
+            obs = np.asarray(env.reset())
             reward = 0
             done = False
             
@@ -80,11 +80,11 @@ if __name__ == '__main__':
                 rewards.append(reward)
 
                 if done: break
-                obs = np.array(new_obs)
+                obs = np.asarray(new_obs)
 
             #BUILD PB2 OBJECTS
             traj, info = Trajectory(), Info()
-            traj.vector_obs.extend(np.array(observations).flatten())
+            traj.vector_obs.extend(np.asarray(observations).flatten())
             traj.actions.extend(actions)
             traj.rewards.extend(rewards)
             info.vector_obs_spec.extend(observations[0].shape)
