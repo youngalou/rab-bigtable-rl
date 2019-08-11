@@ -49,15 +49,7 @@ if __name__ == '__main__':
                       learning_rate=LEARNING_RATE)
     gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
 
-    #SETUP TENSORBOARD/METRICS
-    train_log_dir = os.path.join(args.output_dir, 'logs/')
-    os.makedirs(os.path.dirname(train_log_dir), exist_ok=True)
-    loss_metrics = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
-    train_summary_writer = tf.summary.create_file_writer(train_log_dir)
-
-    #TRAINING LOOP
-    print("-> Starting training...")
-    for epoch in range(args.train_epochs):
+    for epoch in range(1):
         global_i = cbt_global_iterator(cbt_table)
         for i in tqdm(range(args.train_steps), "Trajectories {} - {}".format(global_i - args.train_steps, global_i)):
             row_key_i = global_i - args.train_steps + i
@@ -72,12 +64,21 @@ if __name__ == '__main__':
             traj.ParseFromString(bytes_traj)
             info.ParseFromString(bytes_info)
 
+            print("row_key_i: ", row_key_i)
+            print("row_key:", row_key)
+            print("row: ", row)
+            print(range(len(traj.vector_obs)))
             #FORMAT DATA
             traj_shape = np.append(info.num_steps, info.vector_obs_spec)
             obs = np.asarray(traj.vector_obs).reshape(traj_shape)
+            actions = np.asarray(traj.actions)
             next_obs = np.roll(obs, shift=-1, axis=0)
 
-            #COMPUTE GRADIENTS
+            print("traj shape: ", traj_shape)
+            print("obs : ", obs)
+            print("actions: ", actions)
+            print("next_obs: ", next_obs)
+
             with tf.GradientTape() as tape:
                 q_pred = model(obs)
                 q_pred = [q[a] for q, a in zip(q_pred, traj.actions)]
@@ -85,22 +86,19 @@ if __name__ == '__main__':
                 q_next = [q[tf.argmax(q)] for q in q_next]
                 q_next[-1] = 0
                 q_target = traj.rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next)
-
+                print ("q_target")
+                print (q_target)
+                print ("q_next")
+                print (q_next)
+                print ("tf.multiply")
+                print (tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next))
+                print ("q_pred")
+                print (q_pred)
                 mse = tf.keras.losses.MeanSquaredError()
                 loss = mse(q_pred, q_target)
+                print ("loss")
+                print (loss)
 
-            #APPLY GRADIENTS
             total_grads = tape.gradient(loss, model.trainable_weights)
             model.opt.apply_gradients(zip(total_grads, model.trainable_weights))
 
-            #TENSORBOARD LOGGING
-            loss_metrics(loss)
-            total_reward = np.sum(traj.rewards)
-            with train_summary_writer.as_default():
-                tf.summary.scalar('loss', loss_metrics.result(), step=i+(epoch*args.train_steps))
-                tf.summary.scalar('total reward', total_reward, step=i+(epoch*args.train_steps))
-
-        #SAVE MODEL WEIGHTS
-        model_filename = args.prefix + '_model.h5'
-        gcs_save_weights(model, gcs_bucket, args.tmp_weights_filepath, model_filename)
-    print("-> Done!")

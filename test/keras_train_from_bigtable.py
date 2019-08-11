@@ -13,6 +13,7 @@ from protobuf.experience_replay_pb2 import Trajectory, Info
 from train.dqn_model import DQN_Model
 from train.gcp_io import gcp_load_pipeline, gcs_load_weights, gcs_save_weights, cbt_global_iterator
 
+next_time = time.time()
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
@@ -27,7 +28,7 @@ if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
     parser = argparse.ArgumentParser('Train-From-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
-    parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
+    parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable-test')
     parser.add_argument('--cbt-table-name', type=str, default='cartpole-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
     parser.add_argument('--prefix', type=str, default='cartpole')
@@ -54,12 +55,17 @@ if __name__ == '__main__':
     os.makedirs(os.path.dirname(train_log_dir), exist_ok=True)
     loss_metrics = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
-
+    
+    next_time = (time.time() - next_time)
+    print("load to trainng loop: {:5.5f}".format(next_time))
     #TRAINING LOOP
     print("-> Starting training...")
     for epoch in range(args.train_epochs):
         global_i = cbt_global_iterator(cbt_table)
         for i in tqdm(range(args.train_steps), "Trajectories {} - {}".format(global_i - args.train_steps, global_i)):
+            next_time = (time.time()-next_time)
+            next_time = (time.time()-next_time)
+            print("start getting rows {:5.5f}".format(next_time))
             row_key_i = global_i - args.train_steps + i
             row_key = args.prefix + '_trajectory_' + str(row_key_i)
             row = cbt_table.read_row(row_key)
@@ -71,12 +77,16 @@ if __name__ == '__main__':
             traj, info = Trajectory(), Info()
             traj.ParseFromString(bytes_traj)
             info.ParseFromString(bytes_info)
+            next_time = (time.time()-next_time)
+            print("retreive rows {:5.5f}".format(next_time))
 
             #FORMAT DATA
             traj_shape = np.append(info.num_steps, info.vector_obs_spec)
             obs = np.asarray(traj.vector_obs).reshape(traj_shape)
             next_obs = np.roll(obs, shift=-1, axis=0)
-
+            
+            next_time = (time.time()-next_time)
+            print("format data {:5.5f}".format(next_time))
             #COMPUTE GRADIENTS
             with tf.GradientTape() as tape:
                 q_pred = model(obs)
@@ -87,20 +97,27 @@ if __name__ == '__main__':
                 q_target = traj.rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next)
 
                 mse = tf.keras.losses.MeanSquaredError()
-                loss = mse(q_pred, q_target)
-
+                loss = mse(q_target, q_pred)
+            next_time = (time.time()-next_time)
+            print("compute gradient {:5.5f}".format(next_time))
+ 
             #APPLY GRADIENTS
             total_grads = tape.gradient(loss, model.trainable_weights)
             model.opt.apply_gradients(zip(total_grads, model.trainable_weights))
-
+            next_time = (time.time()-next_time)
+            print("apply gradient {:5.5f}".format(next_time))
             #TENSORBOARD LOGGING
             loss_metrics(loss)
             total_reward = np.sum(traj.rewards)
             with train_summary_writer.as_default():
                 tf.summary.scalar('loss', loss_metrics.result(), step=i+(epoch*args.train_steps))
                 tf.summary.scalar('total reward', total_reward, step=i+(epoch*args.train_steps))
+            next_time = (time.time()-next_time)
+            print("tensorboard logging {:5.5f}".format(next_time))
 
         #SAVE MODEL WEIGHTS
-        model_filename = args.prefix + '_model.h5'
+        model_filename = args.prefix + '_model_test.h5'
         gcs_save_weights(model, gcs_bucket, args.tmp_weights_filepath, model_filename)
+        next_time = (time.time()-next_time)
+        print("saving weights {:5.5f}".format(next_time))
     print("-> Done!")
