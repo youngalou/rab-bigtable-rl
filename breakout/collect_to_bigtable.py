@@ -12,7 +12,8 @@ from google.oauth2 import service_account
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
 from breakout.dqn_model import DQN_Model
-from breakout.gcp_io import gcp_load_pipeline, gcs_load_weights, cbt_global_iterator
+from util.gcp_io import gcp_load_pipeline, gcs_load_weights, cbt_global_iterator
+from util.logging import TimeLogger
 
 import gym
 
@@ -38,29 +39,34 @@ if __name__ == '__main__':
     parser.add_argument('--prefix', type=str, default='breakout')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000000)
-    parser.add_argument('--num-episodes', type=int, default=1000)
+    parser.add_argument('--num-episodes', type=int, default=10)
     parser.add_argument('--max-steps', type=int, default=1000)
+    parser.add_argument('--log-time', default=False, action='store_true')
     args = parser.parse_args()
 
     #INSTANTIATE CBT TABLE AND GCS BUCKET
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     cbt_table, gcs_bucket = gcp_load_pipeline(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, args.bucket_id, credentials)
-
-    #LOAD MODEL
-    model = DQN_Model(input_shape=VISUAL_OBS_SPEC,
-                      num_actions=NUM_ACTIONS,
-                      conv_layer_params=CONV_LAYER_PARAMS,
-                      fc_layer_params=FC_LAYER_PARAMS,
-                      learning_rate=LEARNING_RATE)
+    cbt_batcher = cbt_table.mutations_batcher(flush_count=args.num_episodes, max_row_bytes=10080100)
 
     #INITIALIZE ENVIRONMENT
     print("-> Initializing Gym environement...")
     env = gym.make('Breakout-v0')
     print("-> Environment intialized.")
 
+    #LOAD MODEL
+    model = DQN_Model(input_shape=env.observation_space.shape,
+                      num_actions=env.action_space.n,
+                      conv_layer_params=CONV_LAYER_PARAMS,
+                      fc_layer_params=FC_LAYER_PARAMS,
+                      learning_rate=LEARNING_RATE)
+
     #GLOBAL ITERATOR
     global_i = cbt_global_iterator(cbt_table)
     print("global_i = {}".format(global_i))
+
+    if args.log_time is True:
+        time_logger = TimeLogger(["Collect Data" , "Serialize Data", "Write Cells", "Mutate Rows"], num_cycles=args.num_episodes)
 
     #COLLECT DATA FOR CBT
     print("-> Starting data collection...")
@@ -68,6 +74,8 @@ if __name__ == '__main__':
     for cycle in range(args.num_cycles):
         gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
         for i in tqdm(range(args.num_episodes), "Cycle {}".format(cycle)):
+            if args.log_time is True: time_logger.reset()
+
             #RL LOOP GENERATES A TRAJECTORY
             observations, actions, rewards = [], [], []
             obs = np.asarray(env.reset() / 255).astype(float)
@@ -84,6 +92,8 @@ if __name__ == '__main__':
 
                 if done: break
                 obs = np.asarray(new_obs / 255).astype(float)
+            
+            if args.log_time is True: time_logger.log(0)
 
             #BUILD PB2 OBJECTS
             traj, info = Trajectory(), Info()
@@ -92,6 +102,8 @@ if __name__ == '__main__':
             traj.rewards.extend(rewards)
             info.vector_obs_spec.extend(observations[0].shape)
             info.num_steps = len(actions)
+
+            if args.log_time is True: time_logger.log(1)
 
             #WRITE TO AND APPEND ROW
             row_key_i = i + global_i + (cycle * args.num_episodes)
@@ -104,13 +116,21 @@ if __name__ == '__main__':
                         column='info'.encode(),
                         value=info.SerializeToString())
             rows.append(row)
+            
+            if args.log_time is True: time_logger.log(2)
+        
         gi_row = cbt_table.row('global_iterator'.encode())
         gi_row.set_cell(column_family_id='global',
                         column='i'.encode(),
                         value=struct.pack('i',row_key_i+1),
                         timestamp=datetime.datetime.utcnow())
         rows.append(gi_row)
-        cbt_table.mutate_rows(rows)
+        cbt_batcher.mutate_rows(rows)
+        cbt_batcher.flush()
+
+        if args.log_time is True: time_logger.log(3)
+        if args.log_time is True: time_logger.print_logs()
+        
         rows = []
         print("-> Saved trajectories {} - {}.".format(row_key_i - (args.num_episodes-1), row_key_i))
     env.close()
