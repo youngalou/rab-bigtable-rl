@@ -10,8 +10,8 @@ import tensorflow as tf
 from google.oauth2 import service_account
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
-from train.dqn_model import DQN_Model
-from train.gcp_io import gcp_load_pipeline, gcs_load_weights, gcs_save_weights, cbt_global_iterator, cbt_read_rows
+from cartpole.dqn_model import DQN_Model
+from cartpole.gcp_io import gcp_load_pipeline, gcs_load_weights, gcs_save_weights, cbt_global_iterator, cbt_read_rows
 
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'

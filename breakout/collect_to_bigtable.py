@@ -11,8 +11,8 @@ import tensorflow as tf
 from google.oauth2 import service_account
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
-from train.dqn_model import DQN_Model
-from train.gcp_io import gcp_load_pipeline, gcs_load_weights, cbt_global_iterator
+from breakout.dqn_model import DQN_Model
+from breakout.gcp_io import gcp_load_pipeline, gcs_load_weights, cbt_global_iterator
 
 import gym
 

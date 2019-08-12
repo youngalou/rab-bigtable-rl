@@ -6,8 +6,8 @@ import numpy as np
 
 from google.oauth2 import service_account
 
-from train.dqn_model import DQN_Model
-from train.gcp_io import gcs_load_bucket, gcs_load_weights, cbt_global_iterator
+from breakout.dqn_model import DQN_Model
+from breakout.gcp_io import gcs_load_bucket, gcs_load_weights, cbt_global_iterator
 
 import gym
 
