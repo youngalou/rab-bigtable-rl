@@ -76,8 +76,6 @@ if __name__ == '__main__':
             traj_shape = np.append(info.num_steps, info.vector_obs_spec)
             obs = np.asarray(traj.vector_obs).reshape(traj_shape)
             next_obs = np.roll(obs, shift=-1, axis=0)
-            traj_actions = np.zeros((info.num_steps, NUM_ACTIONS))
-            # traj_actions = [ for a in traj.actions]
 
             #COMPUTE LOSS
             with tf.GradientTape() as tape:
