@@ -81,6 +81,5 @@ def cbt_read_rows(cbt_table, prefix, train_steps, global_i):
     start_i, end_i = global_i - train_steps, global_i - 1
     start_row_key = prefix + '_trajectory_' + str(start_i)
     end_row_key = prefix + '_trajectory_' + str(end_i)
-    row_filter = row_filters.CellsRowLimitFilter(1)
-    partial_rows = cbt_table.read_rows(start_row_key, end_row_key)
+    partial_rows = cbt_table.read_rows(start_row_key, end_row_key, limit=train_steps, end_inclusive=True)
     return [row for row in partial_rows]

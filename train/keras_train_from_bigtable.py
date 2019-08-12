@@ -95,7 +95,7 @@ if __name__ == '__main__':
             with tf.GradientTape() as tape:
                 q_pred, q_next = model(obs), model(next_obs)
                 one_hot_actions = tf.one_hot(traj.actions, NUM_ACTIONS)
-                q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1).numpy()
+                q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
                 q_next = tf.reduce_max(q_next, axis=-1)
                 q_target = traj.rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next)
 
