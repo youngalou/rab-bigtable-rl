@@ -36,6 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--train-steps', type=int, default=100)
     parser.add_argument('--period', type=int, default=100)
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
+    parser.add_argument('--log-time', default=False, action='store_true')
     args = parser.parse_args()
 
     #INSTANTIATE CBT TABLE AND GCS BUCKET
@@ -59,10 +60,20 @@ if __name__ == '__main__':
     print("-> Starting training...")
     for epoch in range(args.train_epochs):
         global_i = cbt_global_iterator(cbt_table)
+        total_fetchdata_time, total_parsedata_time, total_computeloss_time, total_generategrads_time = 0, 0, 0, 0
         for i in tqdm(range(args.train_steps), "Trajectories {} - {}".format(global_i - args.train_steps, global_i - 1)):
+            if args.log_time:
+                start_time = time.time()
+            
             row_key_i = global_i - args.train_steps + i
             row_key = args.prefix + '_trajectory_' + str(row_key_i)
             row = cbt_table.read_row(row_key)
+
+            if args.log_time:
+                current_time = time.time()
+                total_fetchdata_time += current_time - start_time
+                start_time = current_time
+
             if row is None:
                 print("Row_key [{}] not found.")
                 exit()
@@ -77,6 +88,11 @@ if __name__ == '__main__':
             obs = np.asarray(traj.vector_obs).reshape(traj_shape)
             next_obs = np.roll(obs, shift=-1, axis=0)
 
+            if args.log_time:
+                current_time = time.time()
+                total_parsedata_time += current_time - start_time
+                start_time = current_time
+
             #COMPUTE LOSS
             with tf.GradientTape() as tape:
                 q_pred, q_next = model(obs), model(next_obs)
@@ -87,10 +103,20 @@ if __name__ == '__main__':
 
                 mse = tf.keras.losses.MeanSquaredError()
                 loss = mse(q_pred, q_target)
+            
+            if args.log_time:
+                current_time = time.time()
+                total_computeloss_time += current_time - start_time
+                start_time = current_time
 
             #GENERATE GRADIENTS
             total_grads = tape.gradient(loss, model.trainable_weights)
             model.opt.apply_gradients(zip(total_grads, model.trainable_weights))
+
+            if args.log_time:
+                current_time = time.time()
+                total_generategrads_time += current_time - start_time
+                start_time = current_time
 
             #TENSORBOARD LOGGING
             loss_metrics(loss)
@@ -99,6 +125,12 @@ if __name__ == '__main__':
                 tf.summary.scalar('loss', loss_metrics.result(), step=i+(epoch*args.train_steps))
                 tf.summary.scalar('total reward', total_reward, step=i+(epoch*args.train_steps))
 
+        if args.log_time:
+            avg_fetchdata_time = total_fetchdata_time/args.train_steps
+            avg_parsedata_time = total_parsedata_time/args.train_steps
+            avg_computeloss_time = total_computeloss_time/args.train_steps
+            avg_generategrads_time = total_generategrads_time/args.train_steps
+            print("AVERAGE - | Fetch Data: {} | Parse Data: {} | Compute Loss {} | Generate Grads {} |".format(avg_fetchdata_time, avg_parsedata_time, avg_computeloss_time, avg_generategrads_time))
         #SAVE MODEL WEIGHTS
         model_filename = args.prefix + '_model.h5'
         gcs_save_weights(model, gcs_bucket, args.tmp_weights_filepath, model_filename)
