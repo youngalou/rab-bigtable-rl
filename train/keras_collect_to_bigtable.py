@@ -36,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--prefix', type=str, default='cartpole')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000000)
-    parser.add_argument('--num-episodes', type=int, default=100)
+    parser.add_argument('--num-episodes', type=int, default=1000)
     parser.add_argument('--max-steps', type=int, default=100)
     args = parser.parse_args()
 

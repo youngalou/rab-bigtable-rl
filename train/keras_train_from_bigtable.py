@@ -33,7 +33,7 @@ if __name__ == '__main__':
     parser.add_argument('--prefix', type=str, default='cartpole')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--train-epochs', type=int, default=1000000)
-    parser.add_argument('--train-steps', type=int, default=100)
+    parser.add_argument('--train-steps', type=int, default=1000)
     parser.add_argument('--period', type=int, default=100)
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     parser.add_argument('--log-time', default=False, action='store_true')
