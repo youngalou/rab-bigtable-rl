@@ -59,24 +59,26 @@ if __name__ == '__main__':
     #TRAINING LOOP
     print("-> Starting training...")
     for epoch in range(args.train_epochs):
+        if args.log_time:
+            total_fetchdata_time, total_parsedata_time, total_computeloss_time, total_generategrads_time = 0, 0, 0, 0
+            start_time = time.time()
+
+        #FETCH DATA
         global_i = cbt_global_iterator(cbt_table)
-        total_fetchdata_time, total_parsedata_time, total_computeloss_time, total_generategrads_time = 0, 0, 0, 0
-        for i in tqdm(range(args.train_steps), "Trajectories {} - {}".format(global_i - args.train_steps, global_i - 1)):
-            if args.log_time:
-                start_time = time.time()
-            
-            row_key_i = global_i - args.train_steps + i
-            row_key = args.prefix + '_trajectory_' + str(row_key_i)
-            row = cbt_table.read_row(row_key)
+        start_i = global_i - args.train_steps
+        end_i = global_i - 1
+        start_row_key = args.prefix + '_trajectory_' + str(start_i)
+        end_row_key = args.prefix + '_trajectory_' + str(end_i)
+        partial_rows = cbt_table.read_rows(start_row_key, end_row_key)
+        rows = [row for row in partial_rows]
 
-            if args.log_time:
-                current_time = time.time()
-                total_fetchdata_time += current_time - start_time
-                start_time = current_time
+        if args.log_time:
+            current_time = time.time()
+            total_fetchdata_time += current_time - start_time
+            start_time = current_time
 
-            if row is None:
-                print("Row_key [{}] not found.")
-                exit()
+        for i, row in tqdm(enumerate(rows), "Trajectories {} - {}".format(global_i - args.train_steps, global_i - 1)):
+            #DESERIALIZE DATA
             bytes_traj = row.cells['trajectory']['traj'.encode()][0].value
             bytes_info = row.cells['trajectory']['info'.encode()][0].value
             traj, info = Trajectory(), Info()
