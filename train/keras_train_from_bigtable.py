@@ -77,7 +77,8 @@ if __name__ == '__main__':
             total_fetchdata_time += current_time - start_time
             start_time = current_time
 
-        for i, row in tqdm(enumerate(rows), "Trajectories {} - {}".format(global_i - args.train_steps, global_i - 1)):
+        i = 0
+        for row in tqdm(rows, "Trajectories {} - {}".format(global_i - args.train_steps, global_i - 1)):
             #DESERIALIZE DATA
             bytes_traj = row.cells['trajectory']['traj'.encode()][0].value
             bytes_info = row.cells['trajectory']['info'.encode()][0].value
@@ -126,6 +127,7 @@ if __name__ == '__main__':
             with train_summary_writer.as_default():
                 tf.summary.scalar('loss', loss_metrics.result(), step=i+(epoch*args.train_steps))
                 tf.summary.scalar('total reward', total_reward, step=i+(epoch*args.train_steps))
+            i += 1
 
         if args.log_time:
             avg_fetchdata_time = total_fetchdata_time/args.train_steps
