@@ -109,6 +109,6 @@ if __name__ == '__main__':
         rows.append(gi_row)
         cbt_table.mutate_rows(rows)
         rows = []
-        print("-> Saved trajectories {} - {}.".format(row_key_i - args.num_episodes, row_key_i))
+        print("-> Saved trajectories {} - {}.".format(row_key_i - (args.num_episodes-1), row_key_i))
     env.close()
     print("-> Done!")

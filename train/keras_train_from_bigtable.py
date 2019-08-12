@@ -59,7 +59,7 @@ if __name__ == '__main__':
     print("-> Starting training...")
     for epoch in range(args.train_epochs):
         global_i = cbt_global_iterator(cbt_table)
-        for i in tqdm(range(args.train_steps), "Trajectories {} - {}".format(global_i - args.train_steps, global_i)):
+        for i in tqdm(range(args.train_steps), "Trajectories {} - {}".format(global_i - args.train_steps, global_i - 1)):
             row_key_i = global_i - args.train_steps + i
             row_key = args.prefix + '_trajectory_' + str(row_key_i)
             row = cbt_table.read_row(row_key)
@@ -76,20 +76,21 @@ if __name__ == '__main__':
             traj_shape = np.append(info.num_steps, info.vector_obs_spec)
             obs = np.asarray(traj.vector_obs).reshape(traj_shape)
             next_obs = np.roll(obs, shift=-1, axis=0)
+            traj_actions = np.zeros((info.num_steps, NUM_ACTIONS))
+            # traj_actions = [ for a in traj.actions]
 
-            #COMPUTE GRADIENTS
+            #COMPUTE LOSS
             with tf.GradientTape() as tape:
-                q_pred = model(obs)
-                q_pred = [q[a] for q, a in zip(q_pred, traj.actions)]
-                q_next = model(next_obs)
-                q_next = [q[tf.argmax(q)] for q in q_next]
-                q_next[-1] = 0
+                q_pred, q_next = model(obs), model(next_obs)
+                one_hot_actions = tf.one_hot(traj.actions, NUM_ACTIONS)
+                q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1).numpy()
+                q_next = tf.reduce_max(q_next, axis=-1)
                 q_target = traj.rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next)
 
                 mse = tf.keras.losses.MeanSquaredError()
                 loss = mse(q_pred, q_target)
 
-            #APPLY GRADIENTS
+            #GENERATE GRADIENTS
             total_grads = tape.gradient(loss, model.trainable_weights)
             model.opt.apply_gradients(zip(total_grads, model.trainable_weights))
 

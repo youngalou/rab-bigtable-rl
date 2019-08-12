@@ -22,7 +22,7 @@ class DQN_Model(tf.keras.models.Model):
         for layer in self.fc_layers:
             inputs = layer(inputs)
         logits = self.q_layer(inputs)
-        return logits
+        return tf.cast(logits, dtype=tf.float32)
     
     def step(self, inputs):
         inputs = np.expand_dims(inputs, 0)
