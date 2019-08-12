@@ -11,7 +11,7 @@ from google.oauth2 import service_account
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
 from train.dqn_model import DQN_Model
-from train.gcp_io import gcp_load_pipeline, gcs_load_weights, gcs_save_weights, cbt_global_iterator
+from train.gcp_io import gcp_load_pipeline, gcs_load_weights, gcs_save_weights, cbt_global_iterator, cbt_read_rows
 
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
@@ -57,6 +57,7 @@ if __name__ == '__main__':
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
 
     #TRAINING LOOP
+    train_step = 0
     print("-> Starting training...")
     for epoch in range(args.train_epochs):
         if args.log_time:
@@ -65,19 +66,13 @@ if __name__ == '__main__':
 
         #FETCH DATA
         global_i = cbt_global_iterator(cbt_table)
-        start_i = global_i - args.train_steps
-        end_i = global_i - 1
-        start_row_key = args.prefix + '_trajectory_' + str(start_i)
-        end_row_key = args.prefix + '_trajectory_' + str(end_i)
-        partial_rows = cbt_table.read_rows(start_row_key, end_row_key)
-        rows = [row for row in partial_rows]
+        rows = cbt_read_rows(cbt_table, args.prefix, args.train_steps, global_i)
 
         if args.log_time:
             current_time = time.time()
             total_fetchdata_time += current_time - start_time
             start_time = current_time
 
-        i = 0
         for row in tqdm(rows, "Trajectories {} - {}".format(global_i - args.train_steps, global_i - 1)):
             #DESERIALIZE DATA
             bytes_traj = row.cells['trajectory']['traj'.encode()][0].value
@@ -125,9 +120,9 @@ if __name__ == '__main__':
             loss_metrics(loss)
             total_reward = np.sum(traj.rewards)
             with train_summary_writer.as_default():
-                tf.summary.scalar('loss', loss_metrics.result(), step=i+(epoch*args.train_steps))
-                tf.summary.scalar('total reward', total_reward, step=i+(epoch*args.train_steps))
-            i += 1
+                tf.summary.scalar('loss', loss_metrics.result(), step=train_step)
+                tf.summary.scalar('total reward', total_reward, step=train_step)
+            train_step += 1
 
         if args.log_time:
             avg_fetchdata_time = total_fetchdata_time/args.train_steps
