@@ -48,7 +48,7 @@ def gcs_load_weights(model, bucket, prefix, tmp_weights_filepath):
             newest_blob.download_to_filename(tmp_weights_filepath)
             model.load_weights(tmp_weights_filepath)
         except:
-            print("-> Model [{}] is currently being written.".format(model.public_url))
+            print("-> Model [{}] is currently being written.".format(newest_blob.public_url))
             return
         model.public_url = newest_blob.public_url
         print("-> Fetched most recent model [{}].".format(model.public_url))

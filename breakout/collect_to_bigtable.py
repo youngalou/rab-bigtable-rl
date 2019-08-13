@@ -25,7 +25,7 @@ VECTOR_OBS_SPEC = [4]
 VISUAL_OBS_SPEC = [210,160,3]
 NUM_ACTIONS=2
 CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
-FC_LAYER_PARAMS=(200,)
+FC_LAYER_PARAMS=(512,200)
 LEARNING_RATE=0.00042
 EPSILON = 0.5
 
@@ -40,15 +40,15 @@ if __name__ == '__main__':
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000000)
     parser.add_argument('--num-episodes', type=int, default=10)
-    parser.add_argument('--max-steps', type=int, default=1000)
+    parser.add_argument('--max-steps', type=int, default=10)
     parser.add_argument('--log-time', default=False, action='store_true')
     args = parser.parse_args()
 
     #INSTANTIATE CBT TABLE AND GCS BUCKET
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     cbt_table, gcs_bucket = gcp_load_pipeline(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, args.bucket_id, credentials)
-    cbt_batcher = cbt_table.mutations_batcher(flush_count=args.num_episodes, max_row_bytes=10080100)
-
+    cbt_batcher = cbt_table.mutations_batcher(flush_count=args.num_episodes, max_row_bytes=500000000)
+                                                                                           #104857600
     #INITIALIZE ENVIRONMENT
     print("-> Initializing Gym environement...")
     env = gym.make('Breakout-v0')

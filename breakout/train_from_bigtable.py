@@ -18,24 +18,25 @@ SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 #SET HYPERPARAMETERS
 VECTOR_OBS_SPEC = [4]
+VISUAL_OBS_SPEC = [210,160,3]
 NUM_ACTIONS=2
-FC_LAYER_PARAMS=(200,)
+CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
+FC_LAYER_PARAMS=(512,200)
 LEARNING_RATE=0.00042
-GAMMA = 0.9
+EPSILON = 0.5
 
 if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
-    parser = argparse.ArgumentParser('Train-From-Bigtable Script')
+    parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
-    parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
-    parser.add_argument('--cbt-table-name', type=str, default='cartpole-experience-replay')
+    parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable-test')
+    parser.add_argument('--cbt-table-name', type=str, default='breakout-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
-    parser.add_argument('--prefix', type=str, default='cartpole')
+    parser.add_argument('--prefix', type=str, default='breakout')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
-    parser.add_argument('--train-epochs', type=int, default=1000000)
-    parser.add_argument('--train-steps', type=int, default=1000)
-    parser.add_argument('--period', type=int, default=100)
-    parser.add_argument('--output-dir', type=str, default='/tmp/training/')
+    parser.add_argument('--num-cycles', type=int, default=1000000)
+    parser.add_argument('--num-episodes', type=int, default=10)
+    parser.add_argument('--max-steps', type=int, default=1000)
     parser.add_argument('--log-time', default=False, action='store_true')
     args = parser.parse_args()
 

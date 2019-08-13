@@ -84,6 +84,8 @@ if __name__ == '__main__':
             traj_shape = np.append(info.num_steps, info.vector_obs_spec)
             obs = np.asarray(traj.vector_obs).reshape(traj_shape)
             next_obs = np.roll(obs, shift=-1, axis=0)
+            next_mask = np.ones(info.num_steps)
+            next_mask[-1] = 0
 
             if args.log_time is True:
                 time_logger.log(1)
@@ -94,6 +96,7 @@ if __name__ == '__main__':
                 one_hot_actions = tf.one_hot(traj.actions, NUM_ACTIONS)
                 q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
                 q_next = tf.reduce_max(q_next, axis=-1)
+                q_next = q_next * next_mask
                 q_target = traj.rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next)
 
                 mse = tf.keras.losses.MeanSquaredError()
