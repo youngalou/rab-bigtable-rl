@@ -56,12 +56,17 @@ if __name__ == '__main__':
     os.makedirs(os.path.dirname(train_log_dir), exist_ok=True)
     loss_metrics = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
+    if args.log_time is True:
+        time_logger = TimeLogger(["Parse Data", "Format Data", "Compute Loss", "Generate Grads"], num_cycles=args.train_steps)
 
     #TRAINING LOOP
     train_step = 0
     exp_buff = ExperienceBuffer(args.buffer_size)
     print("-> Starting training...")
     for epoch in range(args.train_epochs):
+        if args.log_time is True:
+            time_logger.reset()
+            
         #FETCH DATA
         global_i = cbt_global_iterator(cbt_table)
         rows = cbt_read_rows(cbt_table, args.prefix, args.train_steps, global_i)
@@ -72,6 +77,9 @@ if __name__ == '__main__':
             traj, info = Trajectory(), Info()
             traj.ParseFromString(bytes_traj)
             info.ParseFromString(bytes_info)
+            
+            if args.log_time is True:
+                time_logger.log(0)
 
             #FORMAT DATA
             traj_shape = np.append(info.num_steps, info.vector_obs_spec)
@@ -81,6 +89,9 @@ if __name__ == '__main__':
             next_mask[-1] = 0
 
             exp_buff.add_trajectory(obs, traj.actions, traj.rewards, info.num_steps)
+
+            if args.log_time is True:
+                time_logger.log(1)
 
             #COMPUTE LOSS
             if exp_buff.size >= args.buffer_size:
@@ -92,10 +103,16 @@ if __name__ == '__main__':
                     q_next = q_next * exp_buff.next_mask
                     q_target = exp_buff.rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next)
                     loss = model.loss(q_pred, q_target)
+                
+                if args.log_time is True:
+                    time_logger.log(2)
 
                 #GENERATE GRADIENTS
                 total_grads = tape.gradient(loss, model.trainable_weights)
                 model.opt.apply_gradients(zip(total_grads, model.trainable_weights))
+
+                if args.log_time is True:
+                    time_logger.log(3)
 
                 #TENSORBOARD LOGGING
                 loss_metrics(loss)
@@ -104,6 +121,9 @@ if __name__ == '__main__':
                     tf.summary.scalar('loss', loss_metrics.result(), step=train_step)
                     tf.summary.scalar('total reward', total_reward, step=train_step)
                 train_step += 1
+
+        if args.log_time is True:
+            time_logger.print_logs()
 
         #SAVE MODEL WEIGHTS
         model_filename = args.prefix + '_model.h5'
