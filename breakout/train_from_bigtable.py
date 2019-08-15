@@ -23,20 +23,21 @@ NUM_ACTIONS=2
 CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
 FC_LAYER_PARAMS=(512,200)
 LEARNING_RATE=0.00042
-EPSILON = 0.5
+GAMMA = 0.9
 
 if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
-    parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable-test')
+    parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
     parser.add_argument('--cbt-table-name', type=str, default='breakout-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
     parser.add_argument('--prefix', type=str, default='breakout')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
-    parser.add_argument('--num-cycles', type=int, default=1000000)
-    parser.add_argument('--num-episodes', type=int, default=10)
-    parser.add_argument('--max-steps', type=int, default=1000)
+    parser.add_argument('--train-epochs', type=int, default=1000000)
+    parser.add_argument('--train-steps', type=int, default=10)
+    parser.add_argument('--period', type=int, default=10)
+    parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     parser.add_argument('--log-time', default=False, action='store_true')
     args = parser.parse_args()
 
@@ -45,8 +46,9 @@ if __name__ == '__main__':
     cbt_table, gcs_bucket = gcp_load_pipeline(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, args.bucket_id, credentials)
 
     #LOAD MODEL
-    model = DQN_Model(input_shape=VECTOR_OBS_SPEC,
+    model = DQN_Model(input_shape=VISUAL_OBS_SPEC,
                       num_actions=NUM_ACTIONS,
+                      conv_layer_params=CONV_LAYER_PARAMS,
                       fc_layer_params=FC_LAYER_PARAMS,
                       learning_rate=LEARNING_RATE)
     gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
@@ -57,7 +59,7 @@ if __name__ == '__main__':
     loss_metrics = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     if args.log_time is True:
-        time_logger = TimeLogger(["Fetch Data", "Parse Data", "Compute Loss", "Generate Grads"])
+        time_logger = TimeLogger(["Fetch Data", "Parse Data", "Compute Loss", "Generate Grads"], num_cycles=args.train_steps)
 
     #TRAINING LOOP
     train_step = 0
@@ -80,8 +82,8 @@ if __name__ == '__main__':
             info.ParseFromString(bytes_info)
 
             #FORMAT DATA
-            traj_shape = np.append(info.num_steps, info.vector_obs_spec)
-            obs = np.asarray(traj.vector_obs).reshape(traj_shape)
+            traj_shape = np.append(info.num_steps, info.visual_obs_spec)
+            obs = np.asarray(traj.visual_obs).reshape(traj_shape)
             next_obs = np.roll(obs, shift=-1, axis=0)
 
             if args.log_time is True: time_logger.log(1)

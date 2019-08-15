@@ -3,7 +3,7 @@ syntax = "proto2";
 package experience_replay;
 
 message Trajectory {
-    repeated int32 visual_obs = 1 [packed=true];
+    repeated float visual_obs = 1 [packed=true];
     repeated float vector_obs = 2 [packed=true];
     repeated int32 actions = 3 [packed=true];
     repeated float rewards = 4 [packed=true];

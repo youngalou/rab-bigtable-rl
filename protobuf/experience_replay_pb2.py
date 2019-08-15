@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='experience_replay',
   syntax='proto2',
   serialized_options=None,
-  serialized_pb=_b('\n protobuf/experience_replay.proto\x12\x11\x65xperience_replay\"f\n\nTrajectory\x12\x16\n\nvisual_obs\x18\x01 \x03(\x05\x42\x02\x10\x01\x12\x16\n\nvector_obs\x18\x02 \x03(\x02\x42\x02\x10\x01\x12\x13\n\x07\x61\x63tions\x18\x03 \x03(\x05\x42\x02\x10\x01\x12\x13\n\x07rewards\x18\x04 \x03(\x02\x42\x02\x10\x01\"h\n\x04Info\x12\x1b\n\x0fvisual_obs_spec\x18\x05 \x03(\x05\x42\x02\x10\x01\x12\x1b\n\x0fvector_obs_spec\x18\x06 \x03(\x05\x42\x02\x10\x01\x12\x13\n\x0b\x61\x63tion_spec\x18\x07 \x01(\x05\x12\x11\n\tnum_steps\x18\x08 \x01(\x05')
+  serialized_pb=_b('\n protobuf/experience_replay.proto\x12\x11\x65xperience_replay\"f\n\nTrajectory\x12\x16\n\nvisual_obs\x18\x01 \x03(\x02\x42\x02\x10\x01\x12\x16\n\nvector_obs\x18\x02 \x03(\x02\x42\x02\x10\x01\x12\x13\n\x07\x61\x63tions\x18\x03 \x03(\x05\x42\x02\x10\x01\x12\x13\n\x07rewards\x18\x04 \x03(\x02\x42\x02\x10\x01\"h\n\x04Info\x12\x1b\n\x0fvisual_obs_spec\x18\x05 \x03(\x05\x42\x02\x10\x01\x12\x1b\n\x0fvector_obs_spec\x18\x06 \x03(\x05\x42\x02\x10\x01\x12\x13\n\x0b\x61\x63tion_spec\x18\x07 \x01(\x05\x12\x11\n\tnum_steps\x18\x08 \x01(\x05')
 )
 
 
@@ -35,7 +35,7 @@ _TRAJECTORY = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='visual_obs', full_name='experience_replay.Trajectory.visual_obs', index=0,
-      number=1, type=5, cpp_type=1, label=3,
+      number=1, type=2, cpp_type=6, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,

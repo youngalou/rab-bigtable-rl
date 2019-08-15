@@ -97,10 +97,10 @@ if __name__ == '__main__':
 
             #BUILD PB2 OBJECTS
             traj, info = Trajectory(), Info()
-            traj.vector_obs.extend(np.asarray(observations).flatten())
+            traj.visual_obs.extend(np.asarray(observations).flatten())
             traj.actions.extend(actions)
             traj.rewards.extend(rewards)
-            info.vector_obs_spec.extend(observations[0].shape)
+            info.visual_obs_spec.extend(VISUAL_OBS_SPEC)
             info.num_steps = len(actions)
 
             if args.log_time is True: time_logger.log(1)
