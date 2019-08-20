@@ -27,11 +27,12 @@ if __name__ == '__main__':
     parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
     parser.add_argument('--prefix', type=str, default='breakout')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
-    parser.add_argument('--train-epochs', type=int, default=1000000)
-    parser.add_argument('--train-steps', type=int, default=3)
-    parser.add_argument('--period', type=int, default=1)
+    parser.add_argument('--num-trajectories', type=int, default=10)
     parser.add_argument('--buffer-size', type=int, default=10008000)
     parser.add_argument('--batch-size', type=int, default=10)
+    parser.add_argument('--train-epochs', type=int, default=1000000)
+    parser.add_argument('--train-steps', type=int, default=100)
+    parser.add_argument('--period', type=int, default=1)
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     parser.add_argument('--log-time', default=False, action='store_true')
     args = parser.parse_args()
@@ -52,11 +53,11 @@ if __name__ == '__main__':
                       gcs_bucket=gcs_bucket,
                       prefix=args.prefix,
                       tmp_weights_filepath=args.tmp_weights_filepath,
-                      output_dir=args.output_dir,
                       buffer_size=args.buffer_size,
                       batch_size=args.batch_size,
-                      log_time=args.log_time,
                       train_epochs=args.train_epochs,
                       train_steps=args.train_steps,
-                      period=args.period)
+                      period=args.period,
+                      output_dir=args.output_dir,
+                      log_time=args.log_time)
     agent.train()

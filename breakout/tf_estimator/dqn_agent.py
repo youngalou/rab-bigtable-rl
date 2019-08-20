@@ -31,25 +31,27 @@ class DQN_Agent():
                  gcs_bucket=None,
                  prefix=None,
                  tmp_weights_filepath=None,
-                 output_dir=None,
+                 num_trajectories=None,
                  buffer_size=None,
                  batch_size=None,
-                 log_time=False,
                  train_epochs=None,
                  train_steps=None,
-                 period=None):
+                 period=None,
+                 output_dir=None,
+                 log_time=False):
+        self.model = model
         self.cbt_table = cbt_table
         self.gcs_bucket = gcs_bucket
         self.prefix = prefix
         self.tmp_weights_filepath = tmp_weights_filepath
-        self.output_dir = output_dir
-        self.model = model
+        self.num_trajectories = num_trajectories
         self.exp_buff = ExperienceBuffer(buffer_size)
         self.batch_size = batch_size
-        self.log_time = log_time
         self.train_epochs = train_epochs
         self.train_steps = train_steps
         self.period = period
+        self.output_dir = output_dir
+        self.log_time = log_time
 
         gcs_load_weights(self.model, gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
@@ -112,11 +114,12 @@ class DQN_Agent():
         if self.log_time is True: self.time_logger.reset()
         #FETCH DATA
         global_i = cbt_global_iterator(self.cbt_table)
-        rows = cbt_read_rows(self.cbt_table, self.prefix, self.train_steps, global_i)
+        rows = cbt_read_rows(self.cbt_table, self.prefix, self.num_trajectories, global_i)
 
         if self.log_time is True: self.time_logger.log(0)
 
-        for row in tqdm(rows, "Trajectories {} - {}".format(global_i - self.train_steps, global_i - 1)):
+        self.exp_buff.reset()
+        for row in tqdm(rows, "Trajectories {} - {}".format(global_i - self.num_trajectories, global_i - 1)):
             #DESERIALIZE DATA
             bytes_traj = row.cells['trajectory']['traj'.encode()][0].value
             bytes_info = row.cells['trajectory']['info'.encode()][0].value
@@ -146,7 +149,7 @@ class DQN_Agent():
             self.time_logger = TimeLogger(["Fetch Data", "Parse Data", "Build Model", "Compute Loss", "Estimator"])
         print("-> Starting training...")
         for epoch in range(self.train_epochs):
-            self.estimator.train(input_fn=self.train_input_fn, steps=1)
+            self.estimator.train(input_fn=self.train_input_fn, steps=self.train_steps)
 
             if self.log_time is True: self.time_logger.log(4)
             if self.log_time is True: self.time_logger.print_logs()
