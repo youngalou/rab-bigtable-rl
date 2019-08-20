@@ -2,7 +2,7 @@ import logging
 import itertools
 import gym
 import numpy as np
-from mlagents_envs import UnityEnvironment
+from mlagents.envs import UnityEnvironment
 from gym import error, spaces
 
 
@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("gym_unity")
 
 
-class UnityEnv(gym.Env):
+class UnityEnvironmentWrapper(gym.Env):
     """
     Provides Gym wrapper for Unity Learning Environments.
     Multi-agent environments use lists for object types, as done here:

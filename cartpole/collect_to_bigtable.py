@@ -11,7 +11,7 @@ import tensorflow as tf
 from google.oauth2 import service_account
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
-from cartpole.dqn_model import DQN_Model
+from models.dqn_model import DQN_Model
 from util.gcp_io import gcp_load_pipeline, gcs_load_weights, cbt_global_iterator
 
 import gym

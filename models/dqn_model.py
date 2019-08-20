@@ -1,16 +1,41 @@
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers
+from tensorflow.keras.layers import Conv2D, Dense, Flatten
 
-class DQN_Model(tf.keras.models.Model):
+class Custom_Convs(tf.keras.Model):
+    def __init__(self,
+                 conv_layer_params,
+                 activation="relu"):
+        super().__init__(name='')
+
+        self.conv_layers = [Conv2D(padding="same",
+                                    kernel_size=k,
+                                    strides=s,
+                                    filters=f,
+                                    activation=activation,
+                                    name="conv_{}".format(i))
+                      for i,(k,s,f) in enumerate(conv_layer_params)]
+        self.flatten = Flatten()
+    
+    def call(self, inputs):
+        for conv_layer in self.conv_layers:
+            inputs = conv_layer(inputs)
+        embedding = self.flatten(inputs)
+        return embedding
+
+class DQN_Model(tf.keras.Model):
     def __init__(self,
                  input_shape=None,
                  num_actions=None,
+                 conv_layer_params=None,
                  fc_layer_params=None,
                  learning_rate=0.00042):
         super().__init__()
-        self.fc_layers = [layers.Dense(neurons, activation="relu", name="fc_layer_{}".format(i)) for i,(neurons) in enumerate(fc_layer_params)]
-        self.q_layer = layers.Dense(num_actions, name='output')
+        if conv_layer_params is not None:
+            self.convs = Custom_Convs(conv_layer_params)
+        if fc_layer_params is not None:
+            self.fc_layers = [Dense(neurons, activation="relu", name="fc_layer_{}".format(i)) for i,(neurons) in enumerate(fc_layer_params)]
+        self.q_layer = Dense(num_actions, name='output')
 
         self.step(np.zeros(input_shape))
         self.loss = tf.keras.losses.MeanSquaredError()
@@ -20,6 +45,8 @@ class DQN_Model(tf.keras.models.Model):
         self.public_url = None
 
     def call(self, inputs):
+        if self.convs is not None:
+            inputs = self.convs(inputs)
         for layer in self.fc_layers:
             inputs = layer(inputs)
         logits = self.q_layer(inputs)

@@ -6,7 +6,7 @@ import numpy as np
 
 from google.oauth2 import service_account
 
-from cartpole.dqn_model import DQN_Model
+from models.dqn_model import DQN_Model
 from util.gcp_io import gcs_load_bucket, gcs_load_weights, cbt_global_iterator
 
 import gym

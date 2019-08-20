@@ -11,7 +11,7 @@ import tensorflow as tf
 from google.oauth2 import service_account
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
-from breakout.dqn_model import DQN_Model
+from models.dqn_model import DQN_Model
 from util.gcp_io import gcp_load_pipeline, gcs_load_weights, cbt_global_iterator
 from util.logging import TimeLogger
 
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000000)
     parser.add_argument('--num-episodes', type=int, default=10)
-    parser.add_argument('--max-steps', type=int, default=10)
+    parser.add_argument('--max-steps', type=int, default=100)
     parser.add_argument('--log-time', default=False, action='store_true')
     args = parser.parse_args()
 

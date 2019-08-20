@@ -1,7 +1,6 @@
 *.DS_store
 agents
 envs
-models
 *.h5
 get-pip.py
 *.json

@@ -11,12 +11,10 @@ import tensorflow as tf
 from google.oauth2 import service_account
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
-from crane.dqn_model import DQN_Model
+from models.dqn_model import DQN_Model
 from util.gcp_io import gcp_load_pipeline, gcs_load_weights, cbt_global_iterator
 from util.logging import TimeLogger
-
-import gym
-from unity_env import UnityEnv
+from util.unity_env import UnityEnvironmentWrapper
 
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
@@ -38,7 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--cbt-table-name', type=str, default='crane-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
     parser.add_argument('--prefix', type=str, default='crane')
-    parser.add_argument('--env-filename', type=str, default='envs/CraneML/CraneML')
+    parser.add_argument('--env-filename', type=str, default='envs/CraneML/OSX/CraneML_OSX.app')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000000)
     parser.add_argument('--num-episodes', type=int, default=10)

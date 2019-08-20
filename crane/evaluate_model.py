@@ -6,10 +6,9 @@ import numpy as np
 
 from google.oauth2 import service_account
 
-from breakout.dqn_model import DQN_Model
+from models.dqn_model import DQN_Model
 from util.gcp_io import gcs_load_bucket, gcs_load_weights, cbt_global_iterator
-
-import gym
+from util.unity_env import UnityEnvironmentWrapper
 
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
