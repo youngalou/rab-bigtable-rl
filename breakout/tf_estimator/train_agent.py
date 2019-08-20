@@ -35,6 +35,7 @@ if __name__ == '__main__':
     parser.add_argument('--period', type=int, default=1)
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     parser.add_argument('--log-time', default=False, action='store_true')
+    parser.add_argument('--num-gpus', type=int, default=0)
     args = parser.parse_args()
 
     #INSTANTIATE CBT TABLE AND GCS BUCKET
@@ -59,5 +60,6 @@ if __name__ == '__main__':
                       train_steps=args.train_steps,
                       period=args.period,
                       output_dir=args.output_dir,
-                      log_time=args.log_time)
+                      log_time=args.log_time,
+                      num_gpus=args.num_gpus)
     agent.train()

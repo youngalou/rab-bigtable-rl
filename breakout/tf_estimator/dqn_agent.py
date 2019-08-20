@@ -31,14 +31,15 @@ class DQN_Agent():
                  gcs_bucket=None,
                  prefix=None,
                  tmp_weights_filepath=None,
-                 num_trajectories=None,
-                 buffer_size=None,
-                 batch_size=None,
-                 train_epochs=None,
-                 train_steps=None,
-                 period=None,
+                 num_trajectories=10,
+                 buffer_size=10008000,
+                 batch_size=32,
+                 train_epochs=1000,
+                 train_steps=1,
+                 period=1,
                  output_dir=None,
-                 log_time=False):
+                 log_time=False,
+                 num_gpus=0):
         self.model = model
         self.cbt_table = cbt_table
         self.gcs_bucket = gcs_bucket
@@ -55,7 +56,7 @@ class DQN_Agent():
 
         gcs_load_weights(self.model, gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
-        distribution_strategy = get_distribution_strategy(distribution_strategy="default", num_gpus=0)
+        distribution_strategy = get_distribution_strategy(distribution_strategy="default", num_gpus=num_gpus)
         run_config = tf.estimator.RunConfig(train_distribute=distribution_strategy)
         data_format = ('channels_first' if tf.test.is_built_with_cuda() else 'channels_last')
         model_dir = os.path.join(self.output_dir, 'models/')
