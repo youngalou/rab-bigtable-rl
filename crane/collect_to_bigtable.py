@@ -51,7 +51,7 @@ if __name__ == '__main__':
                                                                                           #104857600
     #INITIALIZE ENVIRONMENT
     print("-> Initializing Crane environement...")
-    env = UnityEnv(environment_filename=args.env_filename, use_visual=True)
+    env = UnityEnvironmentWrapper(environment_filename=args.env_filename, use_visual=True)
     print("-> Environment intialized.")
 
     #LOAD MODEL
