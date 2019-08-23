@@ -13,7 +13,8 @@ if __name__ == '__main__':
         'gym',
         'tqdm',
         'google-cloud-bigtable',
-        'google-cloud-storage'
+        'google-cloud-storage',
+        'wandb'
     ]
 
     if platform.startswith('linux'):
