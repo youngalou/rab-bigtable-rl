@@ -26,7 +26,6 @@ GAMMA = 0.9
 
 class DQN_Agent():
     def __init__(self,
-                 model,
                  cbt_table=None,
                  gcs_bucket=None,
                  prefix=None,
@@ -40,7 +39,6 @@ class DQN_Agent():
                  output_dir=None,
                  log_time=False,
                  num_gpus=0):
-        self.model = model
         self.cbt_table = cbt_table
         self.gcs_bucket = gcs_bucket
         self.prefix = prefix
@@ -53,8 +51,6 @@ class DQN_Agent():
         self.period = period
         self.output_dir = output_dir
         self.log_time = log_time
-
-        gcs_load_weights(self.model, gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
         distribution_strategy = get_distribution_strategy(distribution_strategy="default", num_gpus=num_gpus)
         run_config = tf.estimator.RunConfig(train_distribute=distribution_strategy)
@@ -80,21 +76,28 @@ class DQN_Agent():
                           conv_layer_params=CONV_LAYER_PARAMS,
                           fc_layer_params=FC_LAYER_PARAMS,
                           learning_rate=LEARNING_RATE)
+        gcs_load_weights(model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
+
+        ckpt = tf.train.Checkpoint(net=model, optimizer=model.opt, step=tf.compat.v1.train.get_global_step())
 
         if self.log_time is True: self.time_logger.log(2)
 
         (obs, next_obs) = features
         (actions, rewards, next_mask) = labels
         
-        q_pred, q_next = model(obs), model(next_obs)
-        one_hot_actions = tf.one_hot(actions, NUM_ACTIONS)
-        q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
-        q_next = tf.reduce_max(q_next, axis=-1)
-        q_next = tf.cast(q_next, dtype=tf.float64) * next_mask
-        q_target = rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float64), q_next)
-        loss = tf.reduce_sum(model.loss(q_target, q_pred))
+        with tf.GradientTape() as tape:
+            q_pred, q_next = model(obs), model(next_obs)
+            one_hot_actions = tf.one_hot(actions, NUM_ACTIONS)
+            q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
+            q_next = tf.reduce_max(q_next, axis=-1)
+            q_next = tf.cast(q_next, dtype=tf.float64) * next_mask
+            q_target = rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float64), q_next)
+            loss = tf.reduce_sum(model.loss(q_target, q_pred))
 
-        train_op = model.opt.minimize(loss, var_list=model.trainable_variables, global_step=tf.compat.v1.train.get_or_create_global_step())
+        total_grads = tape.gradient(loss, model.trainable_variables)
+        grads_op = model.opt.apply_gradients(zip(total_grads, model.trainable_variables), tf.compat.v1.train.get_global_step())
+        ckpt_op = ckpt.step.assign_add(1)
+        train_op = tf.group(grads_op, ckpt_op)
 
         if self.log_time is True: self.time_logger.log(3)
 
@@ -109,7 +112,8 @@ class DQN_Agent():
             mode=tf.estimator.ModeKeys.TRAIN,
             predictions=q_pred,
             loss=loss,
-            train_op=train_op)
+            train_op=train_op,
+            scaffold=tf.compat.v1.train.Scaffold(saver=ckpt))
 
     def train_input_fn(self):
         if self.log_time is True: self.time_logger.reset()
@@ -147,7 +151,11 @@ class DQN_Agent():
 
     def train(self):
         if self.log_time is True:
-            self.time_logger = TimeLogger(["Fetch Data", "Parse Data", "Build Model", "Compute Loss", "Estimator"])
+            self.time_logger = TimeLogger(["Fetch Data",
+                                           "Parse Data",
+                                           "Build Model",
+                                           "Compute Loss",
+                                           "Estimator"])
         print("-> Starting training...")
         for epoch in range(self.train_epochs):
             self.estimator.train(input_fn=self.train_input_fn, steps=self.train_steps)
@@ -155,7 +163,10 @@ class DQN_Agent():
             if self.log_time is True: self.time_logger.log(4)
             if self.log_time is True: self.time_logger.print_logs()
 
-            if epoch > 0 and epoch % self.period == 0:
-                model_filename = self.prefix + '_model.h5'
-                gcs_save_weights(self.model, self.gcs_bucket, self.tmp_weights_filepath, model_filename)
+            # if epoch > 0 and epoch % self.period == 0:
+            # image = tf.placeholder(tf.float32, [None] + VISUAL_OBS_SPEC)
+            # input_fn = tf.estimator.export.build_raw_serving_input_receiver_fn({'image': image})
+            # self.estimator.export_savedmodel(self.tmp_weights_filepath, input_fn, strip_default_attrs=True)
+                # model_filename = self.prefix + '_model.h5'
+                # gcs_save_weights(self.model, self.gcs_bucket, self.tmp_weights_filepath, model_filename)
         print("-> Done!")

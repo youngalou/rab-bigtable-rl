@@ -9,15 +9,6 @@ from breakout.tf_estimator.dqn_agent import DQN_Agent
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
-#SET HYPERPARAMETERS
-VECTOR_OBS_SPEC = [4]
-VISUAL_OBS_SPEC = [210,160,3]
-NUM_ACTIONS=2
-CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
-FC_LAYER_PARAMS=(512,200)
-LEARNING_RATE=0.00042
-GAMMA = 0.9
-
 if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
@@ -29,10 +20,10 @@ if __name__ == '__main__':
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-trajectories', type=int, default=10)
     parser.add_argument('--buffer-size', type=int, default=10008000)
-    parser.add_argument('--batch-size', type=int, default=10)
+    parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--train-epochs', type=int, default=1000000)
     parser.add_argument('--train-steps', type=int, default=100)
-    parser.add_argument('--period', type=int, default=1)
+    parser.add_argument('--period', type=int, default=10)
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     parser.add_argument('--log-time', default=False, action='store_true')
     parser.add_argument('--num-gpus', type=int, default=0)
@@ -42,18 +33,11 @@ if __name__ == '__main__':
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     cbt_table, gcs_bucket = gcp_load_pipeline(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, args.bucket_id, credentials)
 
-    #LOAD MODEL
-    model = DQN_Model(input_shape=VISUAL_OBS_SPEC,
-                      num_actions=NUM_ACTIONS,
-                      conv_layer_params=CONV_LAYER_PARAMS,
-                      fc_layer_params=FC_LAYER_PARAMS,
-                      learning_rate=LEARNING_RATE)
-
-    agent = DQN_Agent(model=model,
-                      cbt_table=cbt_table,
+    agent = DQN_Agent(cbt_table=cbt_table,
                       gcs_bucket=gcs_bucket,
                       prefix=args.prefix,
                       tmp_weights_filepath=args.tmp_weights_filepath,
+                      num_trajectories=args.num_trajectories,
                       buffer_size=args.buffer_size,
                       batch_size=args.batch_size,
                       train_epochs=args.train_epochs,

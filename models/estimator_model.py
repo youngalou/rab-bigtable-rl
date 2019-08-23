@@ -13,7 +13,7 @@ class Custom_Convs(tf.keras.Model):
                                     strides=s,
                                     filters=f,
                                     activation=activation,
-                                    name="conv_{}".format(i))
+                                    name="conv_layer_{}".format(i))
                       for i,(k,s,f) in enumerate(conv_layer_params)]
         self.flatten = Flatten()
     
