@@ -1,0 +1,56 @@
+diff --git a/breakout/tf_estimator/dqn_agent.py b/breakout/tf_estimator/dqn_agent.py
+index a6ba494..5f5d1a1 100644
+--- a/breakout/tf_estimator/dqn_agent.py
++++ b/breakout/tf_estimator/dqn_agent.py
+@@ -78,7 +78,7 @@ class DQN_Agent():
+                           learning_rate=LEARNING_RATE)
+         gcs_load_weights(model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
+ 
+-        ckpt = tf.train.Checkpoint(net=model, optimizer=model.opt, step=tf.compat.v1.train.get_global_step())
++        # ckpt = tf.train.Checkpoint(net=model, optimizer=model.opt, step=tf.compat.v1.train.get_global_step())
+ 
+         if self.log_time is True: self.time_logger.log(2)
+ 
+@@ -96,8 +96,9 @@ class DQN_Agent():
+ 
+         total_grads = tape.gradient(loss, model.trainable_variables)
+         grads_op = model.opt.apply_gradients(zip(total_grads, model.trainable_variables), tf.compat.v1.train.get_global_step())
+-        ckpt_op = ckpt.step.assign_add(1)
+-        train_op = tf.group(grads_op, ckpt_op)
++        # ckpt_op = ckpt.step.assign_add(1)
++        # train_op = tf.group(grads_op, ckpt_op)
++        train_op = grads_op
+ 
+         if self.log_time is True: self.time_logger.log(3)
+ 
+@@ -112,8 +113,8 @@ class DQN_Agent():
+             mode=tf.estimator.ModeKeys.TRAIN,
+             predictions=q_pred,
+             loss=loss,
+-            train_op=train_op,
+-            scaffold=tf.compat.v1.train.Scaffold(saver=ckpt))
++            train_op=train_op)
++            # scaffold=tf.compat.v1.train.Scaffold(saver=ckpt))
+ 
+     def train_input_fn(self):
+         if self.log_time is True: self.time_logger.reset()
+diff --git a/breakout/tf_estimator/train_agent.py b/breakout/tf_estimator/train_agent.py
+index 9860d94..5190dd9 100644
+--- a/breakout/tf_estimator/train_agent.py
++++ b/breakout/tf_estimator/train_agent.py
+@@ -27,8 +27,15 @@ if __name__ == '__main__':
+     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
+     parser.add_argument('--log-time', default=False, action='store_true')
+     parser.add_argument('--num-gpus', type=int, default=0)
++    parser.add_argument('--wandb', type=str, default=None)
+     args = parser.parse_args()
+ 
++    if args.wandb is not None:
++        import wandb
++        wandb.init(name=args.wandb,
++                   project="rab-bigtable-rl",
++                   entity="42 Robolab")
++
+     #INSTANTIATE CBT TABLE AND GCS BUCKET
+     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+     cbt_table, gcs_bucket = gcp_load_pipeline(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, args.bucket_id, credentials)

@@ -30,12 +30,12 @@ class DQN_Agent():
                  gcs_bucket=None,
                  prefix=None,
                  tmp_weights_filepath=None,
-                 num_trajectories=10,
+                 num_trajectories=2,
                  buffer_size=10008000,
-                 batch_size=32,
+                 batch_size=10,
                  train_epochs=1000,
-                 train_steps=1,
-                 period=1,
+                 train_steps=100,
+                 period=10,
                  output_dir=None,
                  log_time=False,
                  num_gpus=0):
@@ -78,7 +78,7 @@ class DQN_Agent():
                           learning_rate=LEARNING_RATE)
         gcs_load_weights(model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
-        ckpt = tf.train.Checkpoint(net=model, optimizer=model.opt, step=tf.compat.v1.train.get_global_step())
+        # ckpt = tf.train.Checkpoint(net=model, optimizer=model.opt, step=tf.compat.v1.train.get_global_step())
 
         if self.log_time is True: self.time_logger.log(2)
 
@@ -96,8 +96,9 @@ class DQN_Agent():
 
         total_grads = tape.gradient(loss, model.trainable_variables)
         grads_op = model.opt.apply_gradients(zip(total_grads, model.trainable_variables), tf.compat.v1.train.get_global_step())
-        ckpt_op = ckpt.step.assign_add(1)
-        train_op = tf.group(grads_op, ckpt_op)
+        # ckpt_op = ckpt.step.assign_add(1)
+        # train_op = tf.group(grads_op, ckpt_op)
+        train_op = grads_op
 
         if self.log_time is True: self.time_logger.log(3)
 
@@ -112,8 +113,8 @@ class DQN_Agent():
             mode=tf.estimator.ModeKeys.TRAIN,
             predictions=q_pred,
             loss=loss,
-            train_op=train_op,
-            scaffold=tf.compat.v1.train.Scaffold(saver=ckpt))
+            train_op=train_op)
+            # scaffold=tf.compat.v1.train.Scaffold(saver=ckpt))
 
     def train_input_fn(self):
         if self.log_time is True: self.time_logger.reset()

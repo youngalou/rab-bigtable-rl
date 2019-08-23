@@ -27,7 +27,14 @@ if __name__ == '__main__':
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     parser.add_argument('--log-time', default=False, action='store_true')
     parser.add_argument('--num-gpus', type=int, default=0)
+    parser.add_argument('--wandb', type=str, default=None)
     args = parser.parse_args()
+
+    if args.wandb is not None:
+        import wandb
+        wandb.init(name=args.wandb,
+                   project="rab-bigtable-rl",
+                   entity="42 Robolab")
 
     #INSTANTIATE CBT TABLE AND GCS BUCKET
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
