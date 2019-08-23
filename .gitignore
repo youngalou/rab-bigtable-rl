@@ -5,3 +5,4 @@ envs
 get-pip.py
 *.json
 __pycache__
+wandb
