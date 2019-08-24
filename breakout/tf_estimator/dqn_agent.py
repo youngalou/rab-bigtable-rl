@@ -2,13 +2,14 @@ import os
 import argparse
 import datetime
 from tqdm import tqdm
-
 import numpy as np
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
 import tensorflow as tf
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
 from models.estimator_model import DQN_Model, ExperienceBuffer
-from util.gcp_io import gcs_load_weights, gcs_save_weights, cbt_global_iterator, cbt_read_rows
+from util.gcp_io import gcs_load_weights, gcs_save_weights, cbt_global_iterator, cbt_read_row
 from util.logging import TimeLogger
 from util.distributions import get_distribution_strategy
 
@@ -26,24 +27,24 @@ GAMMA = 0.9
 
 class DQN_Agent():
     def __init__(self,
-                 cbt_table=None,
-                 gcs_bucket=None,
-                 prefix=None,
-                 tmp_weights_filepath=None,
-                 num_trajectories=2,
-                 buffer_size=10008000,
-                 batch_size=10,
-                 train_epochs=1000,
-                 train_steps=100,
-                 period=10,
+                 cbt_table,
+                 gcs_bucket,
+                 gcs_bucket_id,
+                 prefix,
+                 tmp_weights_filepath,
+                 buffer_size,
+                 batch_size,
+                 train_epochs,
+                 train_steps,
+                 period,
                  output_dir=None,
                  log_time=False,
                  num_gpus=0):
         self.cbt_table = cbt_table
         self.gcs_bucket = gcs_bucket
+        self.gcs_bucket_id = gcs_bucket_id
         self.prefix = prefix
         self.tmp_weights_filepath = tmp_weights_filepath
-        self.num_trajectories = num_trajectories
         self.exp_buff = ExperienceBuffer(buffer_size)
         self.batch_size = batch_size
         self.train_epochs = train_epochs
@@ -62,9 +63,6 @@ class DQN_Agent():
             config=run_config,
             params={'data_format': data_format})
 
-        # self.model.compile(loss=self.model.loss, optimizer=self.model.opt)
-        # self.estimator = tf.keras.estimator.model_to_estimator(keras_model=self.model, model_dir=model_dir)
-
         # train_log_dir = os.path.join(self.output_dir, 'logs/')
         # os.makedirs(os.path.dirname(train_log_dir), exist_ok=True)
         # self.loss_metrics = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
@@ -76,11 +74,8 @@ class DQN_Agent():
                           conv_layer_params=CONV_LAYER_PARAMS,
                           fc_layer_params=FC_LAYER_PARAMS,
                           learning_rate=LEARNING_RATE)
-        gcs_load_weights(model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
-        # ckpt = tf.train.Checkpoint(net=model, optimizer=model.opt, step=tf.compat.v1.train.get_global_step())
-
-        if self.log_time is True: self.time_logger.log(2)
+        if self.log_time is True: self.time_logger.log(3)
 
         (obs, next_obs) = features
         (actions, rewards, next_mask) = labels
@@ -96,11 +91,9 @@ class DQN_Agent():
 
         total_grads = tape.gradient(loss, model.trainable_variables)
         grads_op = model.opt.apply_gradients(zip(total_grads, model.trainable_variables), tf.compat.v1.train.get_global_step())
-        # ckpt_op = ckpt.step.assign_add(1)
-        # train_op = tf.group(grads_op, ckpt_op)
         train_op = grads_op
 
-        if self.log_time is True: self.time_logger.log(3)
+        if self.log_time is True: self.time_logger.log(4)
 
         # #TENSORBOARD LOGGING
         # self.loss_metrics(loss)
@@ -114,18 +107,21 @@ class DQN_Agent():
             predictions=q_pred,
             loss=loss,
             train_op=train_op)
-            # scaffold=tf.compat.v1.train.Scaffold(saver=ckpt))
 
     def train_input_fn(self):
         if self.log_time is True: self.time_logger.reset()
         #FETCH DATA
-        global_i = cbt_global_iterator(self.cbt_table)
-        rows = cbt_read_rows(self.cbt_table, self.prefix, self.num_trajectories, global_i)
-
-        if self.log_time is True: self.time_logger.log(0)
+        global_i = cbt_global_iterator(self.cbt_table) - 1
 
         self.exp_buff.reset()
-        for row in tqdm(rows, "Trajectories {} - {}".format(global_i - self.num_trajectories, global_i - 1)):
+        i = 0
+        while True:
+            #FETCH ROW FROM CBT
+            row_i = global_i - i
+            row = cbt_read_row(self.cbt_table, self.prefix, row_i)
+
+            if self.log_time is True: self.time_logger.log(0)
+
             #DESERIALIZE DATA
             bytes_traj = row.cells['trajectory']['traj'.encode()][0].value
             bytes_info = row.cells['trajectory']['info'.encode()][0].value
@@ -139,35 +135,50 @@ class DQN_Agent():
 
             self.exp_buff.add_trajectory(obs, traj.actions, traj.rewards, info.num_steps)
 
-            # if self.exp_buff.size >= self.exp_buff.max_size: break
+            if self.log_time is True: self.time_logger.log(1)
+
+            if self.exp_buff.size >= self.exp_buff.max_size: break
+            i += 1
+        print("-> Fetched trajectories {} - {}".format(global_i - i, global_i))
                 
         dataset = tf.data.Dataset.from_tensor_slices(
             ((self.exp_buff.obs, self.exp_buff.next_obs),
             (self.exp_buff.actions, self.exp_buff.rewards, self.exp_buff.next_mask)))
-        dataset = dataset.shuffle(1000).repeat().batch(self.batch_size)
+        dataset = dataset.shuffle(self.exp_buff.max_size).repeat().batch(self.batch_size)
 
-        if self.log_time is True: self.time_logger.log(1)
+        if self.log_time is True: self.time_logger.log(2)
 
         return dataset
 
+    def export_model(self):
+        model_path = 'gs://' + self.gcs_bucket_id + '/' +  self.prefix + '_model'
+        latest_checkpoint = self.estimator.latest_checkpoint()
+        all_checkpoint_files = tf.io.gfile.glob(latest_checkpoint + '*')
+        for filename in all_checkpoint_files:
+            suffix = filename.partition(latest_checkpoint)[2]
+            destination_path = model_path + suffix
+            print('Copying {} to {}'.format(filename, destination_path))
+            tf.io.gfile.copy(filename, destination_path)
+
     def train(self):
         if self.log_time is True:
-            self.time_logger = TimeLogger(["Fetch Data",
-                                           "Parse Data",
-                                           "Build Model",
-                                           "Compute Loss",
-                                           "Estimator"])
+            self.time_logger = TimeLogger(["Fetch Data    ",
+                                           "Parse Data    ",
+                                           "To Dataset    ",
+                                           "Build Model   ",
+                                           "Compute Loss  ",
+                                           "Estimator     ",
+                                           "Save Model    "])
         print("-> Starting training...")
         for epoch in range(self.train_epochs):
             self.estimator.train(input_fn=self.train_input_fn, steps=self.train_steps)
 
-            if self.log_time is True: self.time_logger.log(4)
-            if self.log_time is True: self.time_logger.print_logs()
+            if self.log_time is True: self.time_logger.log(5)
 
-            # if epoch > 0 and epoch % self.period == 0:
-            # image = tf.placeholder(tf.float32, [None] + VISUAL_OBS_SPEC)
-            # input_fn = tf.estimator.export.build_raw_serving_input_receiver_fn({'image': image})
-            # self.estimator.export_savedmodel(self.tmp_weights_filepath, input_fn, strip_default_attrs=True)
-                # model_filename = self.prefix + '_model.h5'
-                # gcs_save_weights(self.model, self.gcs_bucket, self.tmp_weights_filepath, model_filename)
+            if epoch > 0 and epoch % self.period == 0:
+                self.export_model()
+
+            if self.log_time is True: self.time_logger.log(6)
+
+            if self.log_time is True: self.time_logger.print_logs()
         print("-> Done!")

@@ -6,3 +6,4 @@ get-pip.py
 *.json
 __pycache__
 wandb
+mnist.py

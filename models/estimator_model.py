@@ -1,4 +1,7 @@
+import os
 import numpy as np
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
 import tensorflow as tf
 from tensorflow.keras.layers import Conv2D, Dense, Flatten
 
@@ -90,7 +93,7 @@ class ExperienceBuffer():
         # if self.size >= self.max_size:
         #     self.reset()
 
-        new_size = self.size + obs.size
+        new_size = self.size + num_steps
         # if new_size > self.max_size:
         #     obs, actions, rewards, next_obs, next_mask = \
         #         self.split_remainder(obs, actions, rewards, next_obs, next_mask)
@@ -111,8 +114,7 @@ class ExperienceBuffer():
             self.next_mask = np.append(self.next_mask, next_mask, axis=0)
     
     def split_remainder(self, obs, actions, rewards, next_obs, next_mask):
-        remaining_capacity = self.max_size - self.size
-        split = int(remaining_capacity / np.prod(self.obs.shape[1:]))
+        split = self.max_size - self.size
         obs, self._obs = obs[:split], obs[split:]
         actions, self._actions = actions[:split], actions[split:]
         rewards, self._rewards = rewards[:split], rewards[split:]
