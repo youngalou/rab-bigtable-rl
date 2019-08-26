@@ -11,6 +11,7 @@ from util.gcp_io import gcs_load_bucket, gcs_load_weights, cbt_global_iterator
 
 import gym
 
+#SET API CREDENTIALS
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 

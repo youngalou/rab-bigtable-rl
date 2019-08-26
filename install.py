@@ -1,6 +1,7 @@
 from pip._internal import main as pipmain
 
 if __name__ == '__main__':
+    """ Installs package dependencies depending on system. """
     from sys import platform
 
     linux_packages = ['tensorflow-gpu==2.0.0-beta1']
