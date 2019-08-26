@@ -17,6 +17,7 @@ from util.logging import TimeLogger
 
 import gym
 
+#SET API CREDENTIALS
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
@@ -65,6 +66,7 @@ if __name__ == '__main__':
     global_i = cbt_global_iterator(cbt_table)
     print("global_i = {}".format(global_i))
 
+    #INITIALIZE EXECUTION TIME LOGGER
     if args.log_time is True:
         time_logger = TimeLogger(["Collect Data" , "Serialize Data", "Write Cells", "Mutate Rows"], num_cycles=args.num_episodes)
 
@@ -119,11 +121,14 @@ if __name__ == '__main__':
             
             if args.log_time is True: time_logger.log(2)
         
+        #UPDATE GLOBAL ITERATOR
         gi_row = cbt_table.row('global_iterator'.encode())
         gi_row.set_cell(column_family_id='global',
                         column='i'.encode(),
                         value=struct.pack('i',row_key_i+1),
                         timestamp=datetime.datetime.utcnow())
+        
+        #ADD TRAJECTORIES AS ROWS TO BIGTABLE
         rows.append(gi_row)
         cbt_batcher.mutate_rows(rows)
         cbt_batcher.flush()

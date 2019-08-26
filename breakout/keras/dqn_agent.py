@@ -12,6 +12,7 @@ from util.gcp_io import gcs_load_weights, gcs_save_weights, cbt_global_iterator,
 from util.logging import TimeLogger
 from util.distributions import get_distribution_strategy
 
+#SET API CREDENTIALS
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
@@ -25,6 +26,8 @@ LEARNING_RATE=0.00042
 GAMMA = 0.9
 
 class DQN_Agent():
+    """ Initializes a Deep Queue Network(DQN) Model.
+    """
     def __init__(self,
                  model,
                  cbt_table=None,
@@ -46,6 +49,13 @@ class DQN_Agent():
         gcs_load_weights(self.model, gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
     def train(self, train_epochs, train_steps):
+        """ Performs the training loop of the DQN model.
+            Trajectories are downloaded from Bigtable as Protobuf, then deserialized as Numpy arrays 
+            Outputs an .h5 weights file uploaded to gcs bucket.
+
+            train_epochs -- integer representing the number of epochs (default none)
+            train_steps -- integer representing the number of trajectories to download from Bigtable
+        """
         train_log_dir = os.path.join(self.output_dir, 'logs/')
         os.makedirs(os.path.dirname(train_log_dir), exist_ok=True)
         loss_metrics = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
