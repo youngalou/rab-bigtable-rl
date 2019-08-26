@@ -74,6 +74,7 @@ class DQN_Agent():
                           conv_layer_params=CONV_LAYER_PARAMS,
                           fc_layer_params=FC_LAYER_PARAMS,
                           learning_rate=LEARNING_RATE)
+        # gcs_load_weights(model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
         if self.log_time is True: self.time_logger.log(3)
 
