@@ -7,6 +7,12 @@ from google.cloud import bigtable
 from google.cloud.bigtable import row_filters
 
 def gcs_load_bucket(gcp_project_id, bucket_id, credentials):
+    """ returns a gcs_bucket object.
+
+        gcp_project_id --  string (default none)
+        bucket_id -- string (default none)
+        credentials -- json file path (default none)
+    """
     print('-> Looking for the [{}] bucket.'.format(bucket_id))
     storage_client = storage.Client(gcp_project_id, credentials=credentials)
     gcs_bucket = storage_client.get_bucket(bucket_id)
@@ -14,6 +20,13 @@ def gcs_load_bucket(gcp_project_id, bucket_id, credentials):
     return gcs_bucket
 
 def cbt_load_table(gcp_project_id, cbt_instance_id, cbt_table_name, credentials):
+    """ returns a bigtable object.
+
+        gcp_project_id --  string (default none)
+        cbt_instance_id -- string (default none)
+        cbt_table_name -- string (default none)
+        credentials -- json file path (default none)
+    """
     print('-> Looking for the [{}] table.'.format(cbt_table_name))
     client = bigtable.Client(gcp_project_id, admin=True, credentials=credentials)
     instance = client.instance(cbt_instance_id)
@@ -30,11 +43,26 @@ def cbt_load_table(gcp_project_id, cbt_instance_id, cbt_table_name, credentials)
     return cbt_table
 
 def gcp_load_pipeline(gcp_project_id, cbt_instance_id, cbt_table_name, bucket_id, credentials):
+    """ returns a (bigtable object, gcs bucket object).
+
+        gcp_project_id --  string (default none)
+        cbt_instance_id -- string (default none)
+        cbt_table_name -- string (default none)
+        bucket_id -- string (default none)
+        credentials -- json file path (default none)
+    """
     cbt_table = cbt_load_table(gcp_project_id, cbt_instance_id, cbt_table_name, credentials)
     gcs_bucket = gcs_load_bucket(gcp_project_id, bucket_id, credentials)
     return cbt_table, gcs_bucket
 
 def gcs_load_weights(model, bucket, prefix, tmp_weights_filepath):
+    """ Downloads weights from bucket then loads weights to model.
+
+        model -- tensorflow model class (default none)
+        bucket -- gcs bucket object (default none)
+        prefix -- string (default none)
+        tmp_weights_filepath -- filepath (default none)
+    """
     model_prefix = prefix + '_model'
     blobs_list = bucket.list_blobs(max_results=10, prefix=model_prefix)
     newest_blob = None
@@ -56,12 +84,23 @@ def gcs_load_weights(model, bucket, prefix, tmp_weights_filepath):
         print("-> No models match the prefix \'{}\'.".format(model_prefix))
 
 def gcs_save_weights(model, bucket, tmp_weights_filepath, model_filename):
+    """ Saves weights from model then uploads weights to bucket
+
+        model -- tensorflow model class (default none)
+        bucket -- gcs bucket object (default none)
+        tmp_weights_filepath -- filepath (default none)
+        model_filename -- string (default none)
+    """
     model.save_weights(tmp_weights_filepath)
     blob = bucket.blob(model_filename)
     blob.upload_from_filename(tmp_weights_filepath)
     print("-> Saved model to bucket as [{}].".format(model_filename))
 
 def cbt_global_iterator(cbt_table):
+    """ Fetches global iterator count from bigtable
+
+        cbt_table -- bigtable object (default none)
+    """
     row_filter = row_filters.CellsColumnLimitFilter(1)
     gi_row = cbt_table.read_row('global_iterator'.encode())
     if gi_row is not None:
@@ -78,6 +117,14 @@ def cbt_global_iterator(cbt_table):
     return global_i
 
 def cbt_read_rows(cbt_table, prefix, train_steps, global_i):
+    """ Reads N(train_steps) number of rows from cbt_table, starting from the global iterator value.
+
+        cbt_table -- bigtable object (default none)
+        prefix -- string (default none)
+        train_steps -- integer (default none)
+        global_i -- integer (default none)
+
+    """
     start_i, end_i = global_i - train_steps, global_i - 1
     start_row_key = prefix + '_trajectory_' + str(start_i)
     end_row_key = prefix + '_trajectory_' + str(end_i)
@@ -85,6 +132,12 @@ def cbt_read_rows(cbt_table, prefix, train_steps, global_i):
     return [row for row in partial_rows]
 
 def cbt_read_row(cbt_table, prefix, row_i):
+    """ Reads a row from cbt_table indexed by prefix + row_i.
+
+        cbt_table -- bigtable object (default none)
+        prefix -- string (default none)
+        row_i -- integer (default none)
+    """
     row_key = prefix + '_trajectory_' + str(row_i)
     row = cbt_table.read_row(row_key)
     return row
