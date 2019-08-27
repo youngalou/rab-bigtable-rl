@@ -19,7 +19,7 @@ if __name__ == '__main__':
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--buffer-size', type=int, default=100)
     parser.add_argument('--batch-size', type=int, default=10)
-    parser.add_argument('--num_trajectories', type=int, default=10)
+    parser.add_argument('--num-trajectories', type=int, default=10)
     parser.add_argument('--train-epochs', type=int, default=1000000)
     parser.add_argument('--train-steps', type=int, default=50)
     parser.add_argument('--period', type=int, default=10)
