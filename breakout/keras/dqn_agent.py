@@ -100,7 +100,7 @@ class DQN_Agent():
 
         if self.log_time is True: self.time_logger.log(0)
         
-        for row in tqdm(rows, "Trajectories {} - {}".format(global_i - self.num_trajectories, global_i - 1)):
+        for row in tqdm(rows, "Parsing trajectories {} - {}".format(global_i - self.num_trajectories, global_i - 1)):
             #DESERIALIZE DATA
             bytes_traj = row.cells['trajectory']['traj'.encode()][0].value
             bytes_info = row.cells['trajectory']['info'.encode()][0].value
@@ -131,21 +131,22 @@ class DQN_Agent():
         for epoch in range(self.train_epochs):
             self.fill_experience_buffer()
 
-            #COMPUTE LOSS        
-            with tf.GradientTape() as tape:
-                q_pred, q_next = self.model(self.exp_buff.obs), self.model(self.exp_buff.next_obs)
-                one_hot_actions = tf.one_hot(self.exp_buff.actions, NUM_ACTIONS)
-                q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
-                q_next = tf.reduce_max(q_next, axis=-1)
-                q_next = tf.cast(q_next, dtype=tf.float64) * self.exp_buff.next_mask
-                q_target = self.exp_buff.rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float64), q_next)
-                loss = tf.reduce_sum(self.model.loss(q_target, q_pred))
-            
-            if self.log_time is True: self.time_logger.log(2)
+            for step in tqdm(range(self.train_steps), "Epoch {}".format(epoch)):
+                #COMPUTE LOSS        
+                with tf.GradientTape() as tape:
+                    q_pred, q_next = self.model(self.exp_buff.obs), self.model(self.exp_buff.next_obs)
+                    one_hot_actions = tf.one_hot(self.exp_buff.actions, NUM_ACTIONS)
+                    q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
+                    q_next = tf.reduce_max(q_next, axis=-1)
+                    q_next = tf.cast(q_next, dtype=tf.float64) * self.exp_buff.next_mask
+                    q_target = self.exp_buff.rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float64), q_next)
+                    loss = tf.reduce_sum(self.model.loss(q_target, q_pred))
+                
+                if self.log_time is True: self.time_logger.log(2)
 
-            #GENERATE GRADIENTS
-            total_grads = tape.gradient(loss, self.model.trainable_weights)
-            self.model.opt.apply_gradients(zip(total_grads, self.model.trainable_weights))
+                #GENERATE GRADIENTS
+                total_grads = tape.gradient(loss, self.model.trainable_weights)
+                self.model.opt.apply_gradients(zip(total_grads, self.model.trainable_weights))
 
             if self.log_time is True: self.time_logger.log(3)
 
