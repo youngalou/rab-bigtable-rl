@@ -73,14 +73,14 @@ class DQN_Agent():
         self.output_dir = output_dir
         self.log_time = log_time
 
-        distribution_strategy = get_distribution_strategy(distribution_strategy="default", num_gpus=num_gpus)
-        with distribution_strategy.scope():
+        self.distribution_strategy = get_distribution_strategy(distribution_strategy="default", num_gpus=num_gpus)
+        with self.distribution_strategy.scope():
             self.model = DQN_Model(input_shape=VISUAL_OBS_SPEC,
                             num_actions=NUM_ACTIONS,
                             conv_layer_params=CONV_LAYER_PARAMS,
                             fc_layer_params=FC_LAYER_PARAMS,
                             learning_rate=LEARNING_RATE)
-        gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
+        # gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
     def fill_experience_buffer(self):
         """
@@ -138,29 +138,30 @@ class DQN_Agent():
                                            "Save Model      "])
         print("-> Starting training...")
         for epoch in range(self.train_epochs):
-            dataset = self.fill_experience_buffer()
-            exp_buff = iter(dataset)
+            with self.distribution_strategy.scope():
+                dataset = self.fill_experience_buffer()
+                exp_buff = iter(dataset)
 
-            for step in tqdm(range(self.train_steps), "Epoch {}".format(epoch)):
-                ((b_obs, b_next_obs), (b_actions, b_rewards, b_next_mask)) = next(exp_buff)
-                
-                #COMPUTE LOSS        
-                with tf.GradientTape() as tape:
-                    q_pred, q_next = self.model(b_obs), self.model(b_next_obs)
-                    one_hot_actions = tf.one_hot(b_actions, NUM_ACTIONS)
-                    q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
-                    q_next = tf.reduce_max(q_next, axis=-1)
-                    q_next = tf.cast(q_next, dtype=tf.float64) * b_next_mask
-                    q_target = b_rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float64), q_next)
-                    loss = tf.reduce_sum(self.model.loss(q_target, q_pred))
-                
-                if self.log_time is True: self.time_logger.log(3)
+                for step in tqdm(range(self.train_steps), "Epoch {}".format(epoch)):
+                    ((b_obs, b_next_obs), (b_actions, b_rewards, b_next_mask)) = next(exp_buff)
+                    
+                    #COMPUTE LOSS        
+                    with tf.GradientTape() as tape:
+                        q_pred, q_next = self.model(b_obs), self.model(b_next_obs)
+                        one_hot_actions = tf.one_hot(b_actions, NUM_ACTIONS)
+                        q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
+                        q_next = tf.reduce_max(q_next, axis=-1)
+                        q_next = tf.cast(q_next, dtype=tf.float64) * b_next_mask
+                        q_target = b_rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float64), q_next)
+                        loss = tf.reduce_sum(self.model.loss(q_target, q_pred))
+                    
+                    if self.log_time is True: self.time_logger.log(3)
 
-                #GENERATE GRADIENTS
-                total_grads = tape.gradient(loss, self.model.trainable_weights)
-                self.model.opt.apply_gradients(zip(total_grads, self.model.trainable_weights))
+                    #GENERATE GRADIENTS
+                    total_grads = tape.gradient(loss, self.model.trainable_weights)
+                    self.model.opt._distributed_apply(self.distribution_strategy, list(zip(total_grads, self.model.trainable_weights)))
 
-                if self.log_time is True: self.time_logger.log(4)
+                    if self.log_time is True: self.time_logger.log(4)
 
             if epoch > 0 and epoch % self.period == 0:
                 model_filename = self.prefix + '_model.h5'
