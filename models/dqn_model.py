@@ -38,7 +38,7 @@ class DQN_Model(tf.keras.Model):
         self.q_layer = Dense(num_actions, name='output')
 
         self.step(np.zeros(input_shape))
-        self.loss = tf.keras.losses.MeanSquaredError()
+        self.loss = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.SUM)
         self.opt = tf.optimizers.Adam(learning_rate)
 
         self.num_actions = num_actions
@@ -87,14 +87,14 @@ class ExperienceBuffer():
         next_mask = np.ones(num_steps)
         next_mask[-1] = 0
 
-        if self.size >= self.max_size:
-            self.reset()
+        # if self.size >= self.max_size:
+        #     self.reset()
 
         new_size = self.size + obs.size
-        if new_size > self.max_size:
-            obs, actions, rewards, next_obs, next_mask = \
-                self.split_remainder(obs, actions, rewards, next_obs, next_mask)
-            new_size = self.max_size
+        # if new_size > self.max_size:
+        #     obs, actions, rewards, next_obs, next_mask = \
+        #         self.split_remainder(obs, actions, rewards, next_obs, next_mask)
+        #     new_size = self.max_size
 
         self.append(obs, actions, rewards, next_obs, next_mask)
         self.size = new_size
@@ -111,8 +111,7 @@ class ExperienceBuffer():
             self.next_mask = np.append(self.next_mask, next_mask, axis=0)
     
     def split_remainder(self, obs, actions, rewards, next_obs, next_mask):
-        remaining_capacity = self.max_size - self.size
-        split = int(remaining_capacity / np.prod(self.obs.shape[1:]))
+        split = self.max_size - self.size
         obs, self._obs = obs[:split], obs[split:]
         actions, self._actions = actions[:split], actions[split:]
         rewards, self._rewards = rewards[:split], rewards[split:]

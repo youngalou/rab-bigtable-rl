@@ -99,12 +99,14 @@ class DQN_Agent():
                           fc_layer_params=FC_LAYER_PARAMS,
                           learning_rate=LEARNING_RATE)
 
+        ckpt = tf.train.Checkpoint(step=tf.compat.v1.train.get_global_step(), optimizer=model.opt, net=model)
+
         if self.log_time is True: self.time_logger.log(3)
 
         (obs, next_obs) = features
         (actions, rewards, next_mask) = labels
 
-        #COMPUT LOSS        
+        #COMPUTE LOSS        
         with tf.GradientTape() as tape:
             q_pred, q_next = model(obs), model(next_obs)
             one_hot_actions = tf.one_hot(actions, NUM_ACTIONS)
@@ -126,7 +128,8 @@ class DQN_Agent():
             mode=tf.estimator.ModeKeys.TRAIN,
             predictions=q_pred,
             loss=loss,
-            train_op=train_op)
+            train_op=train_op,
+            scaffold=tf.compat.v1.train.Scaffold(saver=ckpt))
 
     def train_input_fn(self):
         """
@@ -174,7 +177,7 @@ class DQN_Agent():
         if self.log_time is True: self.time_logger.log(2)
 
         return dataset
-
+    
     def export_model(self):
         """
         Method that saves the latest checkpoint to gcs_bucket.
@@ -182,15 +185,16 @@ class DQN_Agent():
         """
         model_path = 'gs://' + self.gcs_bucket_id + '/' +  self.prefix + '_model'
         latest_checkpoint = self.estimator.latest_checkpoint()
+        print(latest_checkpoint)
         all_checkpoint_files = tf.io.gfile.glob(latest_checkpoint + '*')
         for filename in all_checkpoint_files:
             suffix = filename.partition(latest_checkpoint)[2]
             destination_path = model_path + suffix
             print('Copying {} to {}'.format(filename, destination_path))
-            tf.io.gfile.copy(filename, destination_path)
+            tf.io.gfile.copy(filename, destination_path, overwrite=True)
 
     def train(self):
-        """ 
+        """
         Method that trains a model using tf.Estimator using parameters defined in the constructor.
 
         """

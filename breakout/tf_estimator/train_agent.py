@@ -20,7 +20,7 @@ if __name__ == '__main__':
     parser.add_argument('--buffer-size', type=int, default=20)
     parser.add_argument('--batch-size', type=int, default=10)
     parser.add_argument('--train-epochs', type=int, default=1000000)
-    parser.add_argument('--train-steps', type=int, default=1)
+    parser.add_argument('--train-steps', type=int, default=5)
     parser.add_argument('--period', type=int, default=10)
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     parser.add_argument('--log-time', default=False, action='store_true')
