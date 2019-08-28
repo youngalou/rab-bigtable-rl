@@ -127,11 +127,11 @@ class DQN_Agent():
             (self.exp_buff.actions, self.exp_buff.rewards, self.exp_buff.next_mask)))
         dataset = dataset.shuffle(self.exp_buff.max_size).repeat().batch(self.batch_size)
 
-        dist_dataset = self.distribution_strategy.experimental_distribute_dataset(dataset)
+        # dist_dataset = self.distribution_strategy.experimental_distribute_dataset(dataset)
 
         if self.log_time is True: self.time_logger.log(2)
 
-        return dist_dataset
+        return dataset
 
     def train(self):
         """
@@ -154,12 +154,12 @@ class DQN_Agent():
                     loss = tf.reduce_sum(mse)
                 
                 total_grads = tape.gradient(loss, self.model.trainable_weights)
-                self.model.opt._distributed_apply(self.distribution_strategy, list(zip(total_grads, self.model.trainable_weights)))
+                self.model.opt.apply_gradients(list(zip(total_grads, self.model.trainable_weights)))
                 return mse
 
             per_example_losses = self.distribution_strategy.experimental_run_v2(step_fn, args=(dist_inputs,))
-            mean_loss = self.distribution_strategy.reduce(tf.distribute.ReduceOp.MEAN, per_example_losses, axis=0)
-            return mean_loss
+            # mean_loss = self.distribution_strategy.reduce(tf.distribute.ReduceOp.MEAN, per_example_losses, axis=0)
+            # return mean_loss
 
         if self.log_time is True:
             self.time_logger = TimeLogger(["Fetch Data      ",
@@ -175,8 +175,7 @@ class DQN_Agent():
                 exp_buff = iter(dataset)
 
                 for step in tqdm(range(self.train_steps), "Epoch {}".format(epoch)):
-                    mean_loss = train_step(next(exp_buff))
-                    print(mean_loss)
+                    train_step(next(exp_buff))
 
             if epoch > 0 and epoch % self.period == 0:
                 model_filename = self.prefix + '_model.h5'
