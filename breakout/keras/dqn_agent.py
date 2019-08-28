@@ -127,9 +127,11 @@ class DQN_Agent():
             (self.exp_buff.actions, self.exp_buff.rewards, self.exp_buff.next_mask)))
         dataset = dataset.shuffle(self.exp_buff.max_size).repeat().batch(self.batch_size)
 
+        dist_dataset = self.distribution_strategy.experimental_distribute_dataset(dataset)
+
         if self.log_time is True: self.time_logger.log(2)
 
-        return dataset
+        return dist_dataset
 
     def train(self):
         """
