@@ -166,7 +166,7 @@ class DQN_Agent():
 
                     #GENERATE GRADIENTS
                     total_grads = tape.gradient(loss, self.model.trainable_weights)
-                    self.model.opt._distributed_apply(self.distribution_strategy, list(zip(total_grads, self.model.trainable_weights)))
+                    self.model.opt._distributed_apply(self.distribution_strategy, list(zip(total_grads, self.model.trainable_weights)), name=None)
 
                     if self.log_time is True: self.time_logger.log(4)
 
