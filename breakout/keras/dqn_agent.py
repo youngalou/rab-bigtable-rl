@@ -114,9 +114,11 @@ class DQN_Agent():
 
             #FORMAT DATA
             obs_shape = np.append(info.num_steps, info.visual_obs_spec).astype(int)
-            obs = np.asarray(traj.visual_obs).reshape(obs_shape)
+            obs = np.asarray(traj.visual_obs).reshape(obs_shape).astype(np.float32)
+            actions = np.asarray(traj.actions)
+            rewards = np.asarray(traj.rewards).astype(np.float32)
 
-            self.exp_buff.add_trajectory(obs, np.asarray(traj.actions), np.asarray(traj.rewards), info.num_steps)
+            self.exp_buff.add_trajectory(obs, actions, rewards, info.num_steps)
 
         if self.log_time is True: self.time_logger.log(1)
 

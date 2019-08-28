@@ -84,7 +84,6 @@ class ExperienceBuffer():
         self.remainder = 0
 
     def add_trajectory(self, obs, actions, rewards, num_steps):
-
         next_obs = np.roll(obs, shift=-1, axis=0)
         next_mask = np.ones(num_steps)
         next_mask[-1] = 0
@@ -98,7 +97,7 @@ class ExperienceBuffer():
         #         self.split_remainder(obs, actions, rewards, next_obs, next_mask)
         #     new_size = self.max_size
 
-        self.append(obs.astype(np.float32), actions, rewards.astype(np.float32), next_obs.astype(np.float32), next_mask)
+        self.append(obs, actions, rewards, next_obs, next_mask)
         self.size = new_size
 
     def append(self, obs, actions, rewards, next_obs, next_mask):
