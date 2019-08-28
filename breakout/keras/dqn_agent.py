@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
-from models.estimator_model import DQN_Model, ExperienceBuffer
+from models.dqn_model import DQN_Model, ExperienceBuffer
 from util.gcp_io import gcs_load_weights, gcs_save_weights, cbt_global_iterator, cbt_read_rows
 from util.logging import TimeLogger
 from util.distributions import get_distribution_strategy
