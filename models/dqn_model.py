@@ -37,7 +37,7 @@ class DQN_Model(tf.keras.Model):
             self.fc_layers = [Dense(neurons, activation="relu", name="fc_layer_{}".format(i)) for i,(neurons) in enumerate(fc_layer_params)]
         self.q_layer = Dense(num_actions, name='output')
 
-        self.step(np.zeros(input_shape))
+        self.step(np.zeros(input_shape, dtype=np.float32))
         self.loss = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.SUM)
         self.opt = tf.optimizers.Adam(learning_rate)
 
