@@ -54,7 +54,8 @@ class DQN_Agent():
                  period,
                  output_dir=None,
                  log_time=False,
-                 num_gpus=0):
+                 num_gpus=0,
+                 tpu_name=None):
         """
         The constructor for DQN_Agent class.
 
@@ -72,9 +73,13 @@ class DQN_Agent():
         self.period = period
         self.output_dir = output_dir
         self.log_time = log_time
+        self.tpu_name = tpu_name
 
-        self.distribution_strategy = get_distribution_strategy(distribution_strategy="default", num_gpus=num_gpus)
-        with self.distribution_strategy.scope():
+        if self.tpu_name is not None:
+            self.distribution_strategy = get_distribution_strategy(distribution_strategy='tpu', tpu_address=self.tpu_name)
+        else:
+            self.distribution_strategy = get_distribution_strategy(distribution_strategy="default", num_gpus=num_gpus)
+        with tf.device('/job:worker'), self.distribution_strategy.scope():
             self.model = DQN_Model(input_shape=VISUAL_OBS_SPEC,
                             num_actions=NUM_ACTIONS,
                             conv_layer_params=CONV_LAYER_PARAMS,
@@ -138,7 +143,7 @@ class DQN_Agent():
                                            "Save Model      "])
         print("-> Starting training...")
         for epoch in range(self.train_epochs):
-            with self.distribution_strategy.scope():
+            with tf.device('/job:worker'), self.distribution_strategy.scope():
                 dataset = self.fill_experience_buffer()
                 exp_buff = iter(dataset)
 

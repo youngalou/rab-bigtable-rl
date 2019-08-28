@@ -26,6 +26,7 @@ if __name__ == '__main__':
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     parser.add_argument('--log-time', default=False, action='store_true')
     parser.add_argument('--num-gpus', type=int, default=0)
+    parser.add_argument('--tpu-name', type=str, default='youngalou')
     parser.add_argument('--wandb', type=str, default=None)
     args = parser.parse_args()
 
@@ -51,5 +52,6 @@ if __name__ == '__main__':
                       period=args.period,
                       output_dir=args.output_dir,
                       log_time=args.log_time,
-                      num_gpus=args.num_gpus)
+                      num_gpus=args.num_gpus,
+                      tpu_name=args.tpu_name)
     agent.train()
