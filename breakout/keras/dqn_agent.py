@@ -138,6 +138,7 @@ class DQN_Agent():
         Method that trains a model using using parameters defined in the constructor.
 
         """
+        @tf.function
         def train_step(dist_inputs):
             def step_fn(inputs):
                 ((b_obs, b_next_obs), (b_actions, b_rewards, b_next_mask)) = inputs
