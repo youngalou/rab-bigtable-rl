@@ -7,6 +7,7 @@ class Custom_Convs(tf.keras.Model):
                  conv_layer_params,
                  activation="relu"):
         super().__init__(name='')
+        tf.keras.backend.set_floatx('float32')
 
         self.conv_layers = [Conv2D(padding="same",
                                     kernel_size=k,
