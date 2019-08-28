@@ -136,6 +136,28 @@ class DQN_Agent():
         Method that trains a model using using parameters defined in the constructor.
 
         """
+        def train_step(dist_inputs):
+            def step_fn(inputs):
+                ((b_obs, b_next_obs), (b_actions, b_rewards, b_next_mask)) = inputs
+
+                with tf.GradientTape() as tape:
+                    q_pred, q_next = self.model(b_obs), self.model(b_next_obs)
+                    one_hot_actions = tf.one_hot(b_actions, NUM_ACTIONS)
+                    q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
+                    q_next = tf.reduce_max(q_next, axis=-1)
+                    q_next = q_next * tf.cast(b_next_mask, dtype=tf.float32)
+                    q_target = b_rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next)
+                    mse = self.model.loss(q_target, q_pred)
+                    loss = tf.reduce_sum(mse)
+                
+                total_grads = tape.gradient(loss, self.model.trainable_weights)
+                self.model.opt._distributed_apply(self.distribution_strategy, list(zip(total_grads, self.model.trainable_weights)))
+                return mse
+
+            per_example_losses = self.distribution_strategy.experimental_run_v2(step_fn, args=(dist_inputs,))
+            mean_loss = self.distribution_strategy.reduce(tf.distribute.ReduceOp.MEAN, per_example_losses, axis=0)
+            return mean_loss
+
         if self.log_time is True:
             self.time_logger = TimeLogger(["Fetch Data      ",
                                            "Parse Data      ",
@@ -150,25 +172,8 @@ class DQN_Agent():
                 exp_buff = iter(dataset)
 
                 for step in tqdm(range(self.train_steps), "Epoch {}".format(epoch)):
-                    ((b_obs, b_next_obs), (b_actions, b_rewards, b_next_mask)) = next(exp_buff)
-                    
-                    #COMPUTE LOSS        
-                    with tf.GradientTape() as tape:
-                        q_pred, q_next = self.model(b_obs), self.model(b_next_obs)
-                        one_hot_actions = tf.one_hot(b_actions, NUM_ACTIONS)
-                        q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
-                        q_next = tf.reduce_max(q_next, axis=-1)
-                        q_next = q_next * tf.cast(b_next_mask, dtype=tf.float32)
-                        q_target = b_rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next)
-                        loss = tf.reduce_sum(self.model.loss(q_target, q_pred))
-                    
-                    if self.log_time is True: self.time_logger.log(3)
-
-                    #GENERATE GRADIENTS
-                    total_grads = tape.gradient(loss, self.model.trainable_weights)
-                    self.model.opt._distributed_apply(self.distribution_strategy, list(zip(total_grads, self.model.trainable_weights)), name=None)
-
-                    if self.log_time is True: self.time_logger.log(4)
+                    mean_loss = train_step(next(exp_buff))
+                    print(mean_loss)
 
             if epoch > 0 and epoch % self.period == 0:
                 model_filename = self.prefix + '_model.h5'
