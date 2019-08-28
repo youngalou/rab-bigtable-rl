@@ -156,8 +156,8 @@ class DQN_Agent():
                         one_hot_actions = tf.one_hot(b_actions, NUM_ACTIONS)
                         q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
                         q_next = tf.reduce_max(q_next, axis=-1)
-                        q_next = tf.cast(q_next, dtype=tf.float64) * b_next_mask
-                        q_target = b_rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float64), q_next)
+                        q_next = q_next * tf.cast(b_next_mask, dtype=tf.float32)
+                        q_target = b_rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next)
                         loss = tf.reduce_sum(self.model.loss(q_target, q_pred))
                     
                     if self.log_time is True: self.time_logger.log(3)
