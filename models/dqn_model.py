@@ -87,6 +87,7 @@ class ExperienceBuffer():
         next_obs = np.roll(obs, shift=-1, axis=0)
         next_mask = np.ones(num_steps)
         next_mask[-1] = 0
+        next_mask = next_mask.astype(np.float32)
 
         # if self.size >= self.max_size:
         #     self.reset()
