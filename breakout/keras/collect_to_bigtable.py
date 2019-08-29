@@ -112,11 +112,11 @@ if __name__ == '__main__':
             row_key = '{}_trajectory_{}'.format(args.prefix,row_key_i).encode()
             row = cbt_table.row(row_key)
             row.set_cell(column_family_id='trajectory',
-                        column='traj'.encode(),
-                        value=traj.SerializeToString())
+                         column='traj'.encode(),
+                         value=traj.SerializeToString())
             row.set_cell(column_family_id='trajectory',
-                        column='info'.encode(),
-                        value=info.SerializeToString())
+                         column='info'.encode(),
+                         value=info.SerializeToString())
             rows.append(row)
             
             if args.log_time is True: time_logger.log(2)
