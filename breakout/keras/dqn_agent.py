@@ -85,7 +85,7 @@ class DQN_Agent():
                             conv_layer_params=CONV_LAYER_PARAMS,
                             fc_layer_params=FC_LAYER_PARAMS,
                             learning_rate=LEARNING_RATE)
-        # gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
+        gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
     def fill_experience_buffer(self):
         """
@@ -113,9 +113,9 @@ class DQN_Agent():
             info.ParseFromString(bytes_info)
 
             #FORMAT DATA
-            obs_shape = np.append(info.num_steps, info.visual_obs_spec).astype(int)
+            obs_shape = np.append(info.num_steps, info.visual_obs_spec).astype(np.int32)
             obs = np.asarray(traj.visual_obs).reshape(obs_shape).astype(np.float32)
-            actions = np.asarray(traj.actions)
+            actions = np.asarray(traj.actions).astype(np.int32)
             rewards = np.asarray(traj.rewards).astype(np.float32)
 
             self.exp_buff.add_trajectory(obs, actions, rewards, info.num_steps)
