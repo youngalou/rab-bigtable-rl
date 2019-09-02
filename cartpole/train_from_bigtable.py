@@ -48,7 +48,7 @@ if __name__ == '__main__':
                       num_actions=NUM_ACTIONS,
                       fc_layer_params=FC_LAYER_PARAMS,
                       learning_rate=LEARNING_RATE)
-    gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
+    # gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
 
     #SETUP TENSORBOARD/LOGGING
     train_log_dir = os.path.join(args.output_dir, 'logs/')
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     loss_metrics = tf.keras.metrics.Mean('train_loss', dtype=tf.float32)
     train_summary_writer = tf.summary.create_file_writer(train_log_dir)
     if args.log_time is True:
-        time_logger = TimeLogger(["Fetch Data", "Parse Data", "Compute Loss", "Generate Grads"])
+        time_logger = TimeLogger(['Fetch Data', 'Parse Data', 'Compute Loss', 'Generate Grads'])
 
     #TRAINING LOOP
     train_step = 0
@@ -70,7 +70,7 @@ if __name__ == '__main__':
         rows = cbt_read_rows(cbt_table, args.prefix, args.train_steps, global_i)
 
         if args.log_time is True:
-            time_logger.log(0)
+            time_logger.log('Fetch Data')
 
         for row in tqdm(rows, "Trajectories {} - {}".format(global_i - args.train_steps, global_i - 1)):
             #DESERIALIZE DATA
@@ -88,7 +88,7 @@ if __name__ == '__main__':
             next_mask[-1] = 0
 
             if args.log_time is True:
-                time_logger.log(1)
+                time_logger.log('Parse Data')
 
             #COMPUTE LOSS
             with tf.GradientTape() as tape:
@@ -103,14 +103,14 @@ if __name__ == '__main__':
                 loss = mse(q_pred, q_target)
             
             if args.log_time is True:
-                time_logger.log(2)
+                time_logger.log('Compute Loss')
 
             #GENERATE GRADIENTS
             total_grads = tape.gradient(loss, model.trainable_weights)
             model.opt.apply_gradients(zip(total_grads, model.trainable_weights))
 
             if args.log_time is True:
-                time_logger.log(3)
+                time_logger.log('Generate Grads')
 
             #TENSORBOARD LOGGING
             loss_metrics(loss)
@@ -121,9 +121,9 @@ if __name__ == '__main__':
             train_step += 1
 
         if args.log_time is True:
-            time_logger.print_logs()
+            time_logger.print_avgtime_logs()
 
-        #SAVE MODEL WEIGHTS
-        model_filename = args.prefix + '_model.h5'
-        gcs_save_weights(model, gcs_bucket, args.tmp_weights_filepath, model_filename)
+        # #SAVE MODEL WEIGHTS
+        # model_filename = args.prefix + '_model.h5'
+        # gcs_save_weights(model, gcs_bucket, args.tmp_weights_filepath, model_filename)
     print("-> Done!")

@@ -69,10 +69,10 @@ class DQN_Agent():
             self.device = None
         with tf.device(self.device), self.distribution_strategy.scope():
             self.model = DQN_Model(input_shape=VISUAL_OBS_SPEC,
-                            num_actions=NUM_ACTIONS,
-                            conv_layer_params=CONV_LAYER_PARAMS,
-                            fc_layer_params=FC_LAYER_PARAMS,
-                            learning_rate=LEARNING_RATE)
+                                   num_actions=NUM_ACTIONS,
+                                   conv_layer_params=CONV_LAYER_PARAMS,
+                                   fc_layer_params=FC_LAYER_PARAMS,
+                                   learning_rate=LEARNING_RATE)
         gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
     def fill_experience_buffer(self):
@@ -90,7 +90,7 @@ class DQN_Agent():
         global_i = cbt_global_iterator(self.cbt_table)
         rows = cbt_read_rows(self.cbt_table, self.prefix, self.num_trajectories, global_i)
 
-        if self.log_time is True: self.time_logger.log(0)
+        if self.log_time is True: self.time_logger.log("Fetch Data      ")
         
         for row in tqdm(rows, "Parsing trajectories {} - {}".format(global_i - self.num_trajectories, global_i - 1)):
             #DESERIALIZE DATA
@@ -108,7 +108,7 @@ class DQN_Agent():
 
             self.exp_buff.add_trajectory(obs, actions, rewards, info.num_steps)
 
-        if self.log_time is True: self.time_logger.log(1)
+        if self.log_time is True: self.time_logger.log("Parse Data      ")
 
         dataset = tf.data.Dataset.from_tensor_slices(
             ((self.exp_buff.obs, self.exp_buff.next_obs),
@@ -117,7 +117,7 @@ class DQN_Agent():
 
         # dist_dataset = self.distribution_strategy.experimental_distribute_dataset(dataset)
 
-        if self.log_time is True: self.time_logger.log(2)
+        if self.log_time is True: self.time_logger.log("To Dataset      ")
 
         return dataset
 
@@ -152,9 +152,7 @@ class DQN_Agent():
         if self.log_time is True:
             self.time_logger = TimeLogger(["Fetch Data      ",
                                            "Parse Data      ",
-                                           "To Dataset      ",
-                                           "Compute Loss    ",
-                                           "Generate Grads  ",
+                                           "Train Step      "
                                            "Save Model      "])
         print("-> Starting training...")
         for epoch in range(self.train_epochs):
@@ -162,14 +160,15 @@ class DQN_Agent():
                 dataset = self.fill_experience_buffer()
                 exp_buff = iter(dataset)
 
-                for step in tqdm(range(self.train_steps), "Epoch {}".format(epoch)):
+                for step in tqdm(range(self.train_steps), "Training epoch {}".format(epoch)):
                     train_step(next(exp_buff))
+                    if self.log_time is True: self.time_logger.log("Train Step      ")
 
             if epoch > 0 and epoch % self.period == 0:
                 model_filename = self.prefix + '_model.h5'
                 gcs_save_weights(self.model, self.gcs_bucket, self.tmp_weights_filepath, model_filename)
 
-            if self.log_time is True: self.time_logger.log(5)
+            if self.log_time is True: self.time_logger.log("Save Model      ")
 
-            if self.log_time is True: self.time_logger.print_logs()
+            if self.log_time is True: self.time_logger.print_avgtime_logs()
         print("-> Done!")

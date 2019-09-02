@@ -34,6 +34,7 @@ class DQN_Model(tf.keras.Model):
         super().__init__()
         if conv_layer_params is not None:
             self.convs = Custom_Convs(conv_layer_params)
+        else: self.convs = None
         if fc_layer_params is not None:
             self.fc_layers = [Dense(neurons, activation="relu", name="fc_layer_{}".format(i)) for i,(neurons) in enumerate(fc_layer_params)]
         self.q_layer = Dense(num_actions, name='output')
