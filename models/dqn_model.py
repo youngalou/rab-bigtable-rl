@@ -82,7 +82,6 @@ class ExperienceBuffer():
         
         self.max_size = max_size
         self.size = 0
-        self.remainder = 0
 
     def add_trajectory(self, obs, actions, rewards, num_steps):
         next_obs = np.roll(obs, shift=-1, axis=0)
@@ -90,38 +89,15 @@ class ExperienceBuffer():
         next_mask[-1] = 0
         next_mask = next_mask.astype(np.float32)
 
-        # if self.size >= self.max_size:
-        #     self.reset()
-
-        new_size = self.size + num_steps
-        # if new_size > self.max_size:
-        #     obs, actions, rewards, next_obs, next_mask = \
-        #         self.split_remainder(obs, actions, rewards, next_obs, next_mask)
-        #     new_size = self.max_size
-
         self.append(obs, actions, rewards, next_obs, next_mask)
-        self.size = new_size
+        self.size = self.size + num_steps
 
     def append(self, obs, actions, rewards, next_obs, next_mask):
-        if self.size == 0:
-            self.obs, self.actions, self.rewards, self.next_obs, self.next_mask = \
-                obs, actions, rewards, next_obs, next_mask
-        else:
-            self.obs.append(obs)
-            self.actions.append(actions)
-            self.rewards.append(rewards)
-            self.next_obs.append(next_obs)
-            self.next_mask.append(next_mask)
-    
-    def split_remainder(self, obs, actions, rewards, next_obs, next_mask):
-        split = self.max_size - self.size
-        obs, self._obs = obs[:split], obs[split:]
-        actions, self._actions = actions[:split], actions[split:]
-        rewards, self._rewards = rewards[:split], rewards[split:]
-        next_obs, self._next_obs = next_obs[:split], next_obs[split:]
-        next_mask, self._next_mask = next_mask[:split], next_mask[split:]
-        self.remainder = self._obs.shape[0]
-        return obs, actions, rewards, next_obs, next_mask
+        self.obs.append(obs)
+        self.actions.append(actions)
+        self.rewards.append(rewards)
+        self.next_obs.append(next_obs)
+        self.next_mask.append(next_mask)
     
     def preprocess(self):
         self.obs = np.concatenate(self.obs, axis=0)
@@ -131,12 +107,4 @@ class ExperienceBuffer():
         self.next_mask = np.concatenate(self.next_mask, axis=0)
 
     def reset(self):
-        if self.remainder == 0:
-            self.__init__(self.max_size)
-        else:
-            self.size = self.remainder
-            self.remainder = 0
-            self.obs, self.actions, self.rewards, self.next_obs, self.next_mask = \
-                self._obs, self._actions, self._rewards, self._next_obs, self._next_mask
-            self._obs, self._actions, self._rewards, self._next_obs, self._next_mask = \
-                None, None, None, None, None
+        self.__init__(self.max_size)
