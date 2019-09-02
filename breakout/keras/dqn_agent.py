@@ -101,7 +101,7 @@ class DQN_Agent():
             info.ParseFromString(bytes_info)
 
             #FORMAT DATA
-            obs_shape = np.append(info.num_steps, info.visual_obs_spec).astype(np.int32)
+            obs_shape = [info.num_steps] + [info.visual_obs_spec]
             obs = np.asarray(traj.visual_obs).reshape(obs_shape).astype(np.float32)
             actions = np.asarray(traj.actions).astype(np.int32)
             rewards = np.asarray(traj.rewards).astype(np.float32)

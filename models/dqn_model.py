@@ -107,11 +107,11 @@ class ExperienceBuffer():
             self.obs, self.actions, self.rewards, self.next_obs, self.next_mask = \
                 obs, actions, rewards, next_obs, next_mask
         else:
-            self.obs = np.append(self.obs, obs, axis=0)
-            self.actions = np.append(self.actions, actions, axis=0)
-            self.rewards = np.append(self.rewards, rewards, axis=0)
-            self.next_obs = np.append(self.next_obs, next_obs, axis=0)
-            self.next_mask = np.append(self.next_mask, next_mask, axis=0)
+            self.obs = np.concatenate(self.obs, obs, axis=0)
+            self.actions = np.concatenate(self.actions, actions, axis=0)
+            self.rewards = np.concatenate(self.rewards, rewards, axis=0)
+            self.next_obs = np.concatenate(self.next_obs, next_obs, axis=0)
+            self.next_mask = np.concatenate(self.next_mask, next_mask, axis=0)
     
     def split_remainder(self, obs, actions, rewards, next_obs, next_mask):
         split = self.max_size - self.size
