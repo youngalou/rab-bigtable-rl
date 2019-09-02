@@ -75,10 +75,10 @@ class DQN_Model(tf.keras.Model):
 class ExperienceBuffer():
     def __init__(self, max_size):
         self.obs, self.actions, self.rewards, self.next_obs, self.next_mask = \
-            None, None, None, None, None
+            [], [], [], [], []
         
         self._obs, self._actions, self._rewards, self._next_obs, self._next_mask = \
-            None, None, None, None, None
+            [], [], [], [], []
         
         self.max_size = max_size
         self.size = 0
@@ -93,7 +93,7 @@ class ExperienceBuffer():
         # if self.size >= self.max_size:
         #     self.reset()
 
-        new_size = self.size + obs.size
+        new_size = self.size + num_steps
         # if new_size > self.max_size:
         #     obs, actions, rewards, next_obs, next_mask = \
         #         self.split_remainder(obs, actions, rewards, next_obs, next_mask)
@@ -107,11 +107,11 @@ class ExperienceBuffer():
             self.obs, self.actions, self.rewards, self.next_obs, self.next_mask = \
                 obs, actions, rewards, next_obs, next_mask
         else:
-            self.obs = np.concatenate(self.obs, obs, axis=0)
-            self.actions = np.concatenate(self.actions, actions, axis=0)
-            self.rewards = np.concatenate(self.rewards, rewards, axis=0)
-            self.next_obs = np.concatenate(self.next_obs, next_obs, axis=0)
-            self.next_mask = np.concatenate(self.next_mask, next_mask, axis=0)
+            self.obs.append(obs)
+            self.actions.append(actions)
+            self.rewards.append(rewards)
+            self.next_obs.append(next_obs)
+            self.next_mask.append(next_mask)
     
     def split_remainder(self, obs, actions, rewards, next_obs, next_mask):
         split = self.max_size - self.size
@@ -122,6 +122,13 @@ class ExperienceBuffer():
         next_mask, self._next_mask = next_mask[:split], next_mask[split:]
         self.remainder = self._obs.shape[0]
         return obs, actions, rewards, next_obs, next_mask
+    
+    def preprocess(self):
+        self.obs = np.concatenate(self.obs, axis=0)
+        self.actions = np.concatenate(self.actions, axis=0)
+        self.rewards = np.concatenate(self.rewards, axis=0)
+        self.next_obs = np.concatenate(self.next_obs, axis=0)
+        self.next_mask = np.concatenate(self.next_mask, axis=0)
 
     def reset(self):
         if self.remainder == 0:
