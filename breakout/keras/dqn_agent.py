@@ -40,46 +40,34 @@ class DQN_Agent():
         log_time (bool): Flag for time logging.
         num_gpus (int): Number of gpu devices for estimator.
     """
-    def __init__(self,
-                 cbt_table,
-                 gcs_bucket,
-                 gcs_bucket_id,
-                 prefix,
-                 tmp_weights_filepath,
-                 buffer_size,
-                 batch_size,
-                 num_trajectories,
-                 train_epochs,
-                 train_steps,
-                 period,
-                 output_dir=None,
-                 log_time=False,
-                 num_gpus=0,
-                 tpu_name=None):
+    def __init__(self, **kwargs):
         """
         The constructor for DQN_Agent class.
 
         """
-        self.cbt_table = cbt_table
-        self.gcs_bucket = gcs_bucket
-        self.gcs_bucket_id = gcs_bucket_id
-        self.prefix = prefix
-        self.tmp_weights_filepath = tmp_weights_filepath
-        self.exp_buff = ExperienceBuffer(buffer_size)
-        self.batch_size = batch_size
-        self.num_trajectories = num_trajectories
-        self.train_epochs = train_epochs
-        self.train_steps = train_steps
-        self.period = period
-        self.output_dir = output_dir
-        self.log_time = log_time
-        self.tpu_name = tpu_name
+        self.cbt_table = kwargs['cbt_table']
+        self.gcs_bucket = kwargs['gcs_bucket']
+        self.gcs_bucket_id = kwargs['gcs_bucket_id']
+        self.prefix = kwargs['prefix']
+        self.tmp_weights_filepath = kwargs['tmp_weights_filepath']
+        self.exp_buff = ExperienceBuffer(kwargs['buffer_size'])
+        self.batch_size = kwargs['batch_size']
+        self.num_trajectories = kwargs['num_trajectories']
+        self.train_epochs = kwargs['train_epochs']
+        self.train_steps = kwargs['train_steps']
+        self.period = kwargs['period']
+        self.output_dir = kwargs['output_dir']
+        self.log_time = kwargs['log_time']
+        self.num_gpus = kwargs['num_gpus']
+        self.tpu_name = kwargs['tpu_name']
 
         if self.tpu_name is not None:
             self.distribution_strategy = get_distribution_strategy(distribution_strategy='tpu', tpu_address=self.tpu_name)
+            self.device = '/job:worker'
         else:
-            self.distribution_strategy = get_distribution_strategy(distribution_strategy="default", num_gpus=num_gpus)
-        with tf.device('/job:worker'), self.distribution_strategy.scope():
+            self.distribution_strategy = get_distribution_strategy(distribution_strategy="default", num_gpus=self.num_gpus)
+            self.device = None
+        with tf.device(self.device), self.distribution_strategy.scope():
             self.model = DQN_Model(input_shape=VISUAL_OBS_SPEC,
                             num_actions=NUM_ACTIONS,
                             conv_layer_params=CONV_LAYER_PARAMS,
@@ -170,7 +158,7 @@ class DQN_Agent():
                                            "Save Model      "])
         print("-> Starting training...")
         for epoch in range(self.train_epochs):
-            with tf.device('/job:worker'), self.distribution_strategy.scope():
+            with tf.device(self.device), self.distribution_strategy.scope():
                 dataset = self.fill_experience_buffer()
                 exp_buff = iter(dataset)
 
