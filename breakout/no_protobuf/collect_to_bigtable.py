@@ -21,7 +21,6 @@ SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 #SET HYPERPARAMETERS
-VECTOR_OBS_SPEC = [4]
 VISUAL_OBS_SPEC = [210,160,3]
 NUM_ACTIONS=2
 CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))

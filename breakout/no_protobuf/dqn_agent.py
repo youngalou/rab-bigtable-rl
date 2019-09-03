@@ -3,21 +3,12 @@ import argparse
 import datetime
 from tqdm import tqdm
 import numpy as np
-
 import tensorflow as tf
 
 from models.dqn_model import DQN_Model, ExperienceBuffer
 from util.gcp_io import gcs_load_weights, gcs_save_weights, cbt_global_iterator, cbt_read_rows
 from util.logging import TimeLogger
 from util.distributions import get_distribution_strategy
-
-#SET HYPERPARAMETERS
-VISUAL_OBS_SPEC = [210,160,3]
-NUM_ACTIONS=2
-CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
-FC_LAYER_PARAMS=(512,200)
-LEARNING_RATE=0.00042
-GAMMA = 0.9
 
 class DQN_Agent():
     """
@@ -43,12 +34,14 @@ class DQN_Agent():
         The constructor for DQN_Agent class.
 
         """
+        hyperparams = kwargs['hyperparams']
+        self.num_actions = hyperparams['num_actions']
+        self.gamma = self.hyperparams['gamma']
         self.cbt_table = kwargs['cbt_table']
         self.gcs_bucket = kwargs['gcs_bucket']
         self.gcs_bucket_id = kwargs['gcs_bucket_id']
         self.prefix = kwargs['prefix']
         self.tmp_weights_filepath = kwargs['tmp_weights_filepath']
-        self.exp_buff = ExperienceBuffer(kwargs['buffer_size'])
         self.batch_size = kwargs['batch_size']
         self.num_trajectories = kwargs['num_trajectories']
         self.train_epochs = kwargs['train_epochs']
@@ -58,6 +51,8 @@ class DQN_Agent():
         self.log_time = kwargs['log_time']
         self.num_gpus = kwargs['num_gpus']
         self.tpu_name = kwargs['tpu_name']
+        self.wandb = kwargs['wandb']
+        self.exp_buff = ExperienceBuffer(kwargs['buffer_size'])
 
         if self.tpu_name is not None:
             self.distribution_strategy = get_distribution_strategy(distribution_strategy='tpu', tpu_address=self.tpu_name)
@@ -66,11 +61,11 @@ class DQN_Agent():
             self.distribution_strategy = get_distribution_strategy(distribution_strategy='default', num_gpus=self.num_gpus)
             self.device = None
         with tf.device(self.device), self.distribution_strategy.scope():
-            self.model = DQN_Model(input_shape=VISUAL_OBS_SPEC,
-                                   num_actions=NUM_ACTIONS,
-                                   conv_layer_params=CONV_LAYER_PARAMS,
-                                   fc_layer_params=FC_LAYER_PARAMS,
-                                   learning_rate=LEARNING_RATE)
+            self.model = DQN_Model(input_shape=self.hyperparams['input_shape'],
+                                   num_actions=self.num_actions,
+                                   conv_layer_params=self.hyperparams['conv_layer_params'],
+                                   fc_layer_params=self.hyperparams['fc_layer_params'],
+                                   learning_rate=self.hyperparams['learning_rate'])
         gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
     def fill_experience_buffer(self):
@@ -135,10 +130,10 @@ class DQN_Agent():
 
                 with tf.GradientTape() as tape:
                     q_pred, q_next = self.model(b_obs), self.model(b_next_obs)
-                    one_hot_actions = tf.one_hot(b_actions, NUM_ACTIONS)
+                    one_hot_actions = tf.one_hot(b_actions, self.num_actions)
                     q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
                     q_next = tf.reduce_max(q_next, axis=-1)
-                    q_target = b_rewards + (tf.constant(GAMMA, dtype=tf.float32) * q_next)
+                    q_target = b_rewards + (tf.constant(self.gamma, dtype=tf.float32) * q_next)
                     mse = self.model.loss(q_target, q_pred)
                     loss = tf.reduce_sum(mse)
                 
@@ -167,6 +162,8 @@ class DQN_Agent():
                 for step in tqdm(range(self.train_steps), "Training epoch {}".format(epoch)):
                     train_step(next(exp_buff))
                     if self.log_time is True: self.time_logger.log("Train Step      ")
+                    if self.wandb is not None:
+                        self.wandb.log({"epoch": epoch})
 
             if epoch > 0 and epoch % self.period == 0:
                 model_filename = self.prefix + '_model.h5'
