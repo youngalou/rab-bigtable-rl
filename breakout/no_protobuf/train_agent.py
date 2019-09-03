@@ -2,7 +2,7 @@ import argparse
 from google.oauth2 import service_account
 
 from util.gcp_io import gcp_load_pipeline
-from breakout.keras.dqn_agent import DQN_Agent
+from breakout.no_protobuf.dqn_agent import DQN_Agent
 
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
@@ -11,7 +11,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
-    parser.add_argument('--cbt-table-name', type=str, default='breakout-experience-replay')
+    parser.add_argument('--cbt-table-name', type=str, default='noprotobuf-breakout-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
     parser.add_argument('--prefix', type=str, default='breakout')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
