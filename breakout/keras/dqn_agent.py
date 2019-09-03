@@ -100,13 +100,19 @@ class DQN_Agent():
             traj.ParseFromString(bytes_traj)
             info.ParseFromString(bytes_info)
 
+            if self.log_time is True: self.time_logger.log("Parse Bytes     ")
+
             #FORMAT DATA
             obs_shape = np.append(info.num_steps, info.visual_obs_spec).astype(np.int32)
             obs = np.asarray(traj.visual_obs).reshape(obs_shape).astype(np.float32)
             actions = np.asarray(traj.actions).astype(np.int32)
             rewards = np.asarray(traj.rewards).astype(np.float32)
 
+            if self.log_time is True: self.time_logger.log("Format Data     ")
+
             self.exp_buff.add_trajectory(obs, actions, rewards, info.num_steps)
+
+            if self.log_time is True: self.time_logger.log("Add To Exp_Buff ")
         self.exp_buff.preprocess()
 
         dataset = tf.data.Dataset.from_tensor_slices(
@@ -116,7 +122,7 @@ class DQN_Agent():
 
         # dist_dataset = self.distribution_strategy.experimental_distribute_dataset(dataset)
 
-        if self.log_time is True: self.time_logger.log("Parse Data      ")
+        if self.log_time is True: self.time_logger.log("To Dataset      ")
 
         return dataset
 
@@ -130,6 +136,8 @@ class DQN_Agent():
             def step_fn(inputs):
                 ((b_obs, b_next_obs), (b_actions, b_rewards, b_next_mask)) = inputs
 
+                if self.log_time is True: self.time_logger.set_start()
+
                 with tf.GradientTape() as tape:
                     q_pred, q_next = self.model(b_obs), self.model(b_next_obs)
                     one_hot_actions = tf.one_hot(b_actions, NUM_ACTIONS)
@@ -139,9 +147,13 @@ class DQN_Agent():
                     q_target = b_rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next)
                     mse = self.model.loss(q_target, q_pred)
                     loss = tf.reduce_sum(mse)
+
+                if self.log_time is True: self.time_logger.log("Compute Loss    ")
                 
                 total_grads = tape.gradient(loss, self.model.trainable_weights)
                 self.model.opt.apply_gradients(list(zip(total_grads, self.model.trainable_weights)))
+
+                if self.log_time is True: self.time_logger.log("Generate Grads  ")
                 return mse
 
             per_example_losses = self.distribution_strategy.experimental_run_v2(step_fn, args=(dist_inputs,))
@@ -150,9 +162,12 @@ class DQN_Agent():
 
         if self.log_time is True:
             self.time_logger = TimeLogger(["Fetch Data      ",
-                                           "Parse Data      ",
-                                           "Train Step      ",
-                                           "Save Model      "])
+                                           "Parse Bytes     ",
+                                           "Format Data     ",
+                                           "Add To Exp_Buff ",
+                                           "To Dataset      ",
+                                           "Compute Loss    ",
+                                           "Generate Grads  "])
         print("-> Starting training...")
         for epoch in range(self.train_epochs):
             with tf.device(self.device), self.distribution_strategy.scope():

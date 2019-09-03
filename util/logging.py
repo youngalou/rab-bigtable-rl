@@ -12,6 +12,9 @@ class TimeLogger():
         for log_id in self.log_ids:
             self.loggers[log_id] = [0,0]
         self.start_time = time.time()
+
+    def set_start(self):
+        self.start_time = time.time(0)
         
     def log(self, log_id):
         current_time = time.time()
