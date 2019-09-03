@@ -12,7 +12,6 @@ from util.logging import TimeLogger
 from util.distributions import get_distribution_strategy
 
 #SET HYPERPARAMETERS
-VECTOR_OBS_SPEC = [4]
 VISUAL_OBS_SPEC = [210,160,3]
 NUM_ACTIONS=2
 CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
@@ -139,8 +138,7 @@ class DQN_Agent():
                     one_hot_actions = tf.one_hot(b_actions, NUM_ACTIONS)
                     q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
                     q_next = tf.reduce_max(q_next, axis=-1)
-                    q_next = q_next * tf.cast(b_next_mask, dtype=tf.float32)
-                    q_target = b_rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next)
+                    q_target = b_rewards + (tf.constant(GAMMA, dtype=tf.float32) * q_next)
                     mse = self.model.loss(q_target, q_pred)
                     loss = tf.reduce_sum(mse)
                 

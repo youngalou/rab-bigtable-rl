@@ -34,12 +34,12 @@ if __name__ == '__main__':
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
     parser.add_argument('--cbt-table-name', type=str, default='noprotobuf-breakout-experience-replay')
-    parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
+    parser.add_argument('--bucket-id', type=str, default='youngalou')
     parser.add_argument('--prefix', type=str, default='breakout')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000000)
     parser.add_argument('--num-episodes', type=int, default=10)
-    parser.add_argument('--max-steps', type=int, default=10)
+    parser.add_argument('--max-steps', type=int, default=100)
     parser.add_argument('--log-time', default=False, action='store_true')
     args = parser.parse_args()
 
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     cbt_table, gcs_bucket = gcp_load_pipeline(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, args.bucket_id, credentials)
     cbt_batcher = cbt_table.mutations_batcher(flush_count=args.num_episodes, max_row_bytes=500000000)
-                                                                                           #104857600
+                                                                                          #104857600
     #INITIALIZE ENVIRONMENT
     print("-> Initializing Gym environement...")
     env = gym.make('Breakout-v0')
@@ -68,7 +68,7 @@ if __name__ == '__main__':
     print("-> Starting data collection...")
     rows = []
     for cycle in range(args.num_cycles):
-        # gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
+        gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
         for i in tqdm(range(args.num_episodes), "Cycle {}".format(cycle)):
 
             #RL LOOP GENERATES A TRAJECTORY
