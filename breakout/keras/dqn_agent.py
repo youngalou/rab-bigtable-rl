@@ -109,8 +109,6 @@ class DQN_Agent():
             self.exp_buff.add_trajectory(obs, actions, rewards, info.num_steps)
         self.exp_buff.preprocess()
 
-        if self.log_time is True: self.time_logger.log("Parse Data      ")
-
         dataset = tf.data.Dataset.from_tensor_slices(
             ((self.exp_buff.obs, self.exp_buff.next_obs),
             (self.exp_buff.actions, self.exp_buff.rewards, self.exp_buff.next_mask)))
@@ -118,7 +116,7 @@ class DQN_Agent():
 
         # dist_dataset = self.distribution_strategy.experimental_distribute_dataset(dataset)
 
-        if self.log_time is True: self.time_logger.log("To Dataset      ")
+        if self.log_time is True: self.time_logger.log("Parse Data      ")
 
         return dataset
 
@@ -171,5 +169,5 @@ class DQN_Agent():
 
             if self.log_time is True: self.time_logger.log("Save Model      ")
 
-            if self.log_time is True: self.time_logger.print_avgtime_logs()
+            if self.log_time is True: self.time_logger.print_totaltime_logs()
         print("-> Done!")
