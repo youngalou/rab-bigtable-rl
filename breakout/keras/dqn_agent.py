@@ -65,7 +65,7 @@ class DQN_Agent():
             self.distribution_strategy = get_distribution_strategy(distribution_strategy='tpu', tpu_address=self.tpu_name)
             self.device = '/job:worker'
         else:
-            self.distribution_strategy = get_distribution_strategy(distribution_strategy="default", num_gpus=self.num_gpus)
+            self.distribution_strategy = get_distribution_strategy(distribution_strategy='default', num_gpus=self.num_gpus)
             self.device = None
         with tf.device(self.device), self.distribution_strategy.scope():
             self.model = DQN_Model(input_shape=VISUAL_OBS_SPEC,
@@ -136,8 +136,6 @@ class DQN_Agent():
             def step_fn(inputs):
                 ((b_obs, b_next_obs), (b_actions, b_rewards, b_next_mask)) = inputs
 
-                if self.log_time is True: self.time_logger.set_start()
-
                 with tf.GradientTape() as tape:
                     q_pred, q_next = self.model(b_obs), self.model(b_next_obs)
                     one_hot_actions = tf.one_hot(b_actions, NUM_ACTIONS)
@@ -147,13 +145,9 @@ class DQN_Agent():
                     q_target = b_rewards + tf.multiply(tf.constant(GAMMA, dtype=tf.float32), q_next)
                     mse = self.model.loss(q_target, q_pred)
                     loss = tf.reduce_sum(mse)
-
-                if self.log_time is True: self.time_logger.log("Compute Loss    ")
                 
                 total_grads = tape.gradient(loss, self.model.trainable_weights)
                 self.model.opt.apply_gradients(list(zip(total_grads, self.model.trainable_weights)))
-
-                if self.log_time is True: self.time_logger.log("Generate Grads  ")
                 return mse
 
             per_example_losses = self.distribution_strategy.experimental_run_v2(step_fn, args=(dist_inputs,))
@@ -166,8 +160,8 @@ class DQN_Agent():
                                            "Format Data     ",
                                            "Add To Exp_Buff ",
                                            "To Dataset      ",
-                                           "Compute Loss    ",
-                                           "Generate Grads  "])
+                                           "Train Step      ",
+                                           "Save Model      "])
         print("-> Starting training...")
         for epoch in range(self.train_epochs):
             with tf.device(self.device), self.distribution_strategy.scope():
@@ -176,6 +170,7 @@ class DQN_Agent():
 
                 for step in tqdm(range(self.train_steps), "Training epoch {}".format(epoch)):
                     train_step(next(exp_buff))
+                    if self.log_time is True: self.time_logger.log("Train Step      ")
 
             if epoch > 0 and epoch % self.period == 0:
                 model_filename = self.prefix + '_model.h5'
