@@ -14,7 +14,7 @@ class TimeLogger():
         self.start_time = time.time()
 
     def set_start(self):
-        self.start_time = time.time(0)
+        self.start_time = time.time()
         
     def log(self, log_id):
         current_time = time.time()

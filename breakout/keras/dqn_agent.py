@@ -176,7 +176,6 @@ class DQN_Agent():
 
                 for step in tqdm(range(self.train_steps), "Training epoch {}".format(epoch)):
                     train_step(next(exp_buff))
-                    if self.log_time is True: self.time_logger.log("Train Step      ")
 
             if epoch > 0 and epoch % self.period == 0:
                 model_filename = self.prefix + '_model.h5'
