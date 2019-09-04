@@ -35,6 +35,7 @@ class UnityEnvironmentWrapper(gym.Env):
         flatten_branched: bool = False,
         no_graphics: bool = False,
         allow_multiple_visual_obs: bool = False,
+        docker_training: bool = False
     ):
         """
         Environment initialization
@@ -49,7 +50,10 @@ class UnityEnvironmentWrapper(gym.Env):
         :param allow_multiple_visual_obs: If True, return a list of visual observations instead of only one.
         """
         self._env = UnityEnvironment(
-            environment_filename, worker_id, no_graphics=no_graphics
+            environment_filename, 
+            worker_id, 
+            no_graphics=no_graphics, 
+            docker_training=docker_training
         )
         self.name = self._env.academy_name
         self.visual_obs = None
