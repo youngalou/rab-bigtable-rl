@@ -42,6 +42,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-episodes', type=int, default=10)
     parser.add_argument('--max-steps', type=int, default=100)
     parser.add_argument('--log-time', default=False, action='store_true')
+    parser.add_argument('--docker-training', type=bool, default=False)
     args = parser.parse_args()
 
     #INSTANTIATE CBT TABLE AND GCS BUCKET
@@ -53,7 +54,7 @@ if __name__ == '__main__':
     print("-> Initializing Crane environement...")
     env = UnityEnvironmentWrapper(  environment_filename=args.env_filename,
                                     use_visual=True,
-                                    docker_training=True)
+                                    docker_training=args.docker_training)
     print("-> Environment intialized.")
 
     #LOAD MODEL
