@@ -42,6 +42,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-episodes', type=int, default=10)
     parser.add_argument('--max-steps', type=int, default=100)
     parser.add_argument('--log-time', default=False, action='store_true')
+    parser.add_argument('--docker-training', type=bool, default=False)
     args = parser.parse_args()
 
     #INSTANTIATE CBT TABLE AND GCS BUCKET
@@ -51,7 +52,9 @@ if __name__ == '__main__':
                                                                                           #104857600
     #INITIALIZE ENVIRONMENT
     print("-> Initializing Crane environement...")
-    env = UnityEnvironmentWrapper(environment_filename=args.env_filename, use_visual=True)
+    env = UnityEnvironmentWrapper(  environment_filename=args.env_filename,
+                                    use_visual=True,
+                                    docker_training=args.docker_training)
     print("-> Environment intialized.")
 
     #LOAD MODEL
@@ -78,7 +81,7 @@ if __name__ == '__main__':
 
             #RL LOOP GENERATES A TRAJECTORY
             observations, actions, rewards = [], [], []
-            obs = np.asarray(env.reset() / 255).astype(float)
+            obs = np.asarray(env.reset() / 255).astype(np.float32)
             reward = 0
             done = False
             
@@ -91,7 +94,7 @@ if __name__ == '__main__':
                 rewards.append(reward)
 
                 if done: break
-                obs = np.asarray(new_obs / 255).astype(float)
+                obs = np.asarray(new_obs / 255).astype(np.float32)
             
             if args.log_time is True: time_logger.log(0)
 
