@@ -7,14 +7,14 @@ from breakout.no_protobuf.dqn_agent import DQN_Agent
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
-hyperparams = {
+hyperparams = dict([
     ('input_shape', [210,160,3]),
     ('num_actions', 2),
     ('conv_layer_params', ((8,4,32),(4,2,64),(3,1,64))),
     ('fc_layer_params', (512,200)),
     ('gamma', 0.9),
     ('learning_rate', 0.00042)
-}
+])
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
@@ -47,7 +47,7 @@ if __name__ == '__main__':
                              "conv_layer_params": hyperparams['conv_layer_params'],
                              "fc_layer_params": hyperparams['fc_layer_params'],
                              "gamma": hyperparams['gamma'],
-                             "learning_rate": hyperparams['learning_rate']
+                             "learning_rate": hyperparams['learning_rate'],
                              "buffer_size": args.buffer_size,
                              "batch_size": args.batch_size,
                              "num_trajectories": args.num_trajectories,
@@ -56,7 +56,7 @@ if __name__ == '__main__':
                              "period": args.period,
                              "num_gpus": args.num_gpus,
                              "tpu_name": args.tpu_name})
-    else: wandb = None     
+    else: wandb = None
 
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     cbt_table, gcs_bucket = gcp_load_pipeline(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, args.bucket_id, credentials)

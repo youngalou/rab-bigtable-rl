@@ -3,6 +3,7 @@ import argparse
 import datetime
 from tqdm import tqdm
 import numpy as np
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
 import tensorflow as tf
 
 from models.dqn_model import DQN_Model, ExperienceBuffer
@@ -35,8 +36,9 @@ class DQN_Agent():
 
         """
         hyperparams = kwargs['hyperparams']
+        self.input_shape = hyperparams['input_shape']
         self.num_actions = hyperparams['num_actions']
-        self.gamma = self.hyperparams['gamma']
+        self.gamma = hyperparams['gamma']
         self.cbt_table = kwargs['cbt_table']
         self.gcs_bucket = kwargs['gcs_bucket']
         self.gcs_bucket_id = kwargs['gcs_bucket_id']
@@ -61,11 +63,11 @@ class DQN_Agent():
             self.distribution_strategy = get_distribution_strategy(distribution_strategy='default', num_gpus=self.num_gpus)
             self.device = None
         with tf.device(self.device), self.distribution_strategy.scope():
-            self.model = DQN_Model(input_shape=self.hyperparams['input_shape'],
+            self.model = DQN_Model(input_shape=self.input_shape,
                                    num_actions=self.num_actions,
-                                   conv_layer_params=self.hyperparams['conv_layer_params'],
-                                   fc_layer_params=self.hyperparams['fc_layer_params'],
-                                   learning_rate=self.hyperparams['learning_rate'])
+                                   conv_layer_params=hyperparams['conv_layer_params'],
+                                   fc_layer_params=hyperparams['fc_layer_params'],
+                                   learning_rate=hyperparams['learning_rate'])
         gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
     def fill_experience_buffer(self):
@@ -97,7 +99,7 @@ class DQN_Agent():
             actions = np.frombuffer(bytes_actions, dtype=np.uint8).astype(np.int32)
             rewards = np.frombuffer(bytes_rewards, dtype=np.float32)
             num_steps = actions.size
-            obs_shape = np.append(num_steps, VISUAL_OBS_SPEC).astype(np.int32)
+            obs_shape = np.append(num_steps, self.input_shape).astype(np.int32)
             obs = np.frombuffer(bytes_obs, dtype=np.float32).reshape(obs_shape)
 
             if self.log_time is True: self.time_logger.log("Format Data     ")
@@ -112,11 +114,11 @@ class DQN_Agent():
             (self.exp_buff.actions, self.exp_buff.rewards, self.exp_buff.next_mask)))
         dataset = dataset.shuffle(self.exp_buff.max_size).repeat().batch(self.batch_size)
 
-        # dist_dataset = self.distribution_strategy.experimental_distribute_dataset(dataset)
+        dist_dataset = self.distribution_strategy.experimental_distribute_dataset(dataset)
 
         if self.log_time is True: self.time_logger.log("To Dataset      ")
 
-        return dataset
+        return dist_dataset
 
     def train(self):
         """
@@ -142,8 +144,8 @@ class DQN_Agent():
                 return mse
 
             per_example_losses = self.distribution_strategy.experimental_run_v2(step_fn, args=(dist_inputs,))
-            # mean_loss = self.distribution_strategy.reduce(tf.distribute.ReduceOp.MEAN, per_example_losses, axis=0)
-            # return mean_loss
+            mean_loss = self.distribution_strategy.reduce(tf.distribute.ReduceOp.MEAN, per_example_losses, axis=None)
+            return mean_loss
 
         if self.log_time is True:
             self.time_logger = TimeLogger(["Fetch Data      ",
@@ -159,11 +161,18 @@ class DQN_Agent():
                 dataset = self.fill_experience_buffer()
                 exp_buff = iter(dataset)
 
+                losses = []
                 for step in tqdm(range(self.train_steps), "Training epoch {}".format(epoch)):
-                    train_step(next(exp_buff))
+                    loss = train_step(next(exp_buff))
+                    losses.append(loss)
+
                     if self.log_time is True: self.time_logger.log("Train Step      ")
-                    if self.wandb is not None:
-                        self.wandb.log({"epoch": epoch})
+                
+                if self.wandb is not None:
+                    mean_loss = np.mean(losses)
+                    tf.summary.scalar("Mean Loss", mean_loss, epoch)
+                    self.wandb.log({"Epoch": epoch,
+                                    "Mean Loss": mean_loss})
 
             if epoch > 0 and epoch % self.period == 0:
                 model_filename = self.prefix + '_model.h5'

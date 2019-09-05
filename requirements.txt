@@ -7,3 +7,4 @@ gym
 tqdm
 google-cloud-bigtable
 google-cloud-storage
+wandb

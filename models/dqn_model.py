@@ -1,4 +1,6 @@
 import numpy as np
+# import os
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
 import tensorflow as tf
 from tensorflow.keras.layers import Conv2D, Dense, Flatten
 
