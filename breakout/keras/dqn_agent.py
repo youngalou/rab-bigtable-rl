@@ -3,7 +3,7 @@ import argparse
 import datetime
 from tqdm import tqdm
 import numpy as np
-
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
 import tensorflow as tf
 
 from protobuf.experience_replay_pb2 import Trajectory, Info
@@ -11,15 +11,6 @@ from models.dqn_model import DQN_Model, ExperienceBuffer
 from util.gcp_io import gcs_load_weights, gcs_save_weights, cbt_global_iterator, cbt_read_rows
 from util.logging import TimeLogger
 from util.distributions import get_distribution_strategy
-
-#SET HYPERPARAMETERS
-VECTOR_OBS_SPEC = [4]
-VISUAL_OBS_SPEC = [210,160,3]
-NUM_ACTIONS=2
-CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
-FC_LAYER_PARAMS=(512,200)
-LEARNING_RATE=0.00042
-GAMMA = 0.9
 
 class DQN_Agent():
     """
@@ -45,12 +36,15 @@ class DQN_Agent():
         The constructor for DQN_Agent class.
 
         """
+        hyperparams = kwargs['hyperparams']
+        self.input_shape = hyperparams['input_shape']
+        self.num_actions = hyperparams['num_actions']
+        self.gamma = hyperparams['gamma']
         self.cbt_table = kwargs['cbt_table']
         self.gcs_bucket = kwargs['gcs_bucket']
         self.gcs_bucket_id = kwargs['gcs_bucket_id']
         self.prefix = kwargs['prefix']
         self.tmp_weights_filepath = kwargs['tmp_weights_filepath']
-        self.exp_buff = ExperienceBuffer(kwargs['buffer_size'])
         self.batch_size = kwargs['batch_size']
         self.num_trajectories = kwargs['num_trajectories']
         self.train_epochs = kwargs['train_epochs']
@@ -60,6 +54,8 @@ class DQN_Agent():
         self.log_time = kwargs['log_time']
         self.num_gpus = kwargs['num_gpus']
         self.tpu_name = kwargs['tpu_name']
+        self.wandb = kwargs['wandb']
+        self.exp_buff = ExperienceBuffer(kwargs['buffer_size'])
 
         if self.tpu_name is not None:
             self.distribution_strategy = get_distribution_strategy(distribution_strategy='tpu', tpu_address=self.tpu_name)
@@ -68,11 +64,11 @@ class DQN_Agent():
             self.distribution_strategy = get_distribution_strategy(distribution_strategy='default', num_gpus=self.num_gpus)
             self.device = None
         with tf.device(self.device), self.distribution_strategy.scope():
-            self.model = DQN_Model(input_shape=VISUAL_OBS_SPEC,
-                                   num_actions=NUM_ACTIONS,
-                                   conv_layer_params=CONV_LAYER_PARAMS,
-                                   fc_layer_params=FC_LAYER_PARAMS,
-                                   learning_rate=LEARNING_RATE)
+            self.model = DQN_Model(input_shape=self.input_shape,
+                                   num_actions=self.num_actions,
+                                   conv_layer_params=hyperparams['conv_layer_params'],
+                                   fc_layer_params=hyperparams['fc_layer_params'],
+                                   learning_rate=hyperparams['learning_rate'])
         gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
     def fill_experience_buffer(self):
@@ -103,14 +99,14 @@ class DQN_Agent():
             if self.log_time is True: self.time_logger.log("Parse Bytes     ")
 
             #FORMAT DATA
-            obs_shape = np.append(info.num_steps, info.visual_obs_spec).astype(np.int32)
-            obs = np.asarray(traj.visual_obs).reshape(obs_shape).astype(np.float32)
-            actions = np.asarray(traj.actions).astype(np.int32)
-            rewards = np.asarray(traj.rewards).astype(np.float32)
+            obs_shape = np.append(info.num_steps._values, info.visual_obs_spec._values).astype(np.int32)
+            obs = np.asarray(traj.visual_obs._values).reshape(obs_shape).astype(np.float32)
+            actions = np.asarray(traj.actions._values).astype(np.int32)
+            rewards = np.asarray(traj.rewards._values).astype(np.float32)
 
             if self.log_time is True: self.time_logger.log("Format Data     ")
 
-            self.exp_buff.add_trajectory(obs, actions, rewards, info.num_steps)
+            self.exp_buff.add_trajectory(obs, actions, rewards, num_steps)
 
             if self.log_time is True: self.time_logger.log("Add To Exp_Buff ")
         self.exp_buff.preprocess()
@@ -120,11 +116,11 @@ class DQN_Agent():
             (self.exp_buff.actions, self.exp_buff.rewards, self.exp_buff.next_mask)))
         dataset = dataset.shuffle(self.exp_buff.max_size).repeat().batch(self.batch_size)
 
-        # dist_dataset = self.distribution_strategy.experimental_distribute_dataset(dataset)
+        dist_dataset = self.distribution_strategy.experimental_distribute_dataset(dataset)
 
         if self.log_time is True: self.time_logger.log("To Dataset      ")
 
-        return dataset
+        return dist_dataset
 
     def train(self):
         """
@@ -138,11 +134,10 @@ class DQN_Agent():
 
                 with tf.GradientTape() as tape:
                     q_pred, q_next = self.model(b_obs), self.model(b_next_obs)
-                    one_hot_actions = tf.one_hot(b_actions, NUM_ACTIONS)
+                    one_hot_actions = tf.one_hot(b_actions, self.num_actions)
                     q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
                     q_next = tf.reduce_max(q_next, axis=-1)
-                    q_next = q_next * b_next_mask
-                    q_target = b_rewards + (tf.constant(GAMMA, dtype=tf.float32) * q_next)
+                    q_target = b_rewards + (tf.constant(self.gamma, dtype=tf.float32) * q_next)
                     mse = self.model.loss(q_target, q_pred)
                     loss = tf.reduce_sum(mse)
                 
@@ -151,8 +146,8 @@ class DQN_Agent():
                 return mse
 
             per_example_losses = self.distribution_strategy.experimental_run_v2(step_fn, args=(dist_inputs,))
-            # mean_loss = self.distribution_strategy.reduce(tf.distribute.ReduceOp.MEAN, per_example_losses, axis=0)
-            # return mean_loss
+            mean_loss = self.distribution_strategy.reduce(tf.distribute.ReduceOp.MEAN, per_example_losses, axis=None)
+            return mean_loss
 
         if self.log_time is True:
             self.time_logger = TimeLogger(["Fetch Data      ",
@@ -168,9 +163,18 @@ class DQN_Agent():
                 dataset = self.fill_experience_buffer()
                 exp_buff = iter(dataset)
 
+                losses = []
                 for step in tqdm(range(self.train_steps), "Training epoch {}".format(epoch)):
-                    train_step(next(exp_buff))
+                    loss = train_step(next(exp_buff))
+                    losses.append(loss)
+
                     if self.log_time is True: self.time_logger.log("Train Step      ")
+                
+                if self.wandb is not None:
+                    mean_loss = np.mean(losses)
+                    tf.summary.scalar("Mean Loss", mean_loss, epoch)
+                    self.wandb.log({"Epoch": epoch,
+                                    "Mean Loss": mean_loss})
 
             if epoch > 0 and epoch % self.period == 0:
                 model_filename = self.prefix + '_model.h5'
