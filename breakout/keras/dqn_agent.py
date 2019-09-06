@@ -6,7 +6,7 @@ import numpy as np
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
 import tensorflow as tf
 
-from protobuf.experience_replay_pb2 import Trajectory, Info
+from protobuf.bytes_experience_replay_pb2 import Observations, Actions, Rewards, Info
 from models.dqn_model import DQN_Model, ExperienceBuffer
 from util.gcp_io import gcs_load_weights, gcs_save_weights, cbt_global_iterator, cbt_read_rows
 from util.logging import TimeLogger
@@ -90,23 +90,28 @@ class DQN_Agent():
         
         for row in tqdm(rows, "Parsing trajectories {} - {}".format(global_i - self.num_trajectories, global_i - 1)):
             #DESERIALIZE DATA
-            bytes_traj = row.cells['trajectory']['traj'.encode()][0].value
+            bytes_obs = row.cells['trajectory']['obs'.encode()][0].value
+            bytes_actions = row.cells['trajectory']['actions'.encode()][0].value
+            bytes_rewards = row.cells['trajectory']['rewards'.encode()][0].value
             bytes_info = row.cells['trajectory']['info'.encode()][0].value
-            traj, info = Trajectory(), Info()
-            traj.ParseFromString(bytes_traj)
+            
+            pb2_obs, pb2_actions, pb2_rewards, info = Observations(), Actions(), Rewards(), Info()
+            pb2_obs.ParseFromString(bytes_obs)
+            pb2_actions.ParseFromString(bytes_actions)
+            pb2_rewards.ParseFromString(bytes_rewards)
             info.ParseFromString(bytes_info)
 
             if self.log_time is True: self.time_logger.log("Parse Bytes     ")
 
             #FORMAT DATA
-            obs_shape = np.append(info.num_steps._values, info.visual_obs_spec._values).astype(np.int32)
-            obs = np.asarray(traj.visual_obs._values).reshape(obs_shape).astype(np.float32)
-            actions = np.asarray(traj.actions._values).astype(np.int32)
-            rewards = np.asarray(traj.rewards._values).astype(np.float32)
+            obs_shape = np.append(info.num_steps, info.visual_obs_spec).astype(np.int32)
+            obs = np.frombuffer(pb2_obs.visual_obs, dtype=np.float32).reshape(obs_shape)
+            actions = np.frombuffer(pb2_actions.actions, dtype=np.uint8).astype(np.int32)
+            rewards = np.frombuffer(pb2_rewards.rewards, dtype=np.float32)
 
             if self.log_time is True: self.time_logger.log("Format Data     ")
 
-            self.exp_buff.add_trajectory(obs, actions, rewards, num_steps)
+            self.exp_buff.add_trajectory(obs, actions, rewards, info.num_steps)
 
             if self.log_time is True: self.time_logger.log("Add To Exp_Buff ")
         self.exp_buff.preprocess()

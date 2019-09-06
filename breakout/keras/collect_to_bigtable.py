@@ -9,7 +9,7 @@ import tensorflow as tf
 
 from google.oauth2 import service_account
 
-from protobuf.experience_replay_pb2 import Trajectory, Info
+from protobuf.bytes_experience_replay_pb2 import Observations, Actions, Rewards, Info
 from models.dqn_model import DQN_Model
 from util.gcp_io import gcp_load_pipeline, gcs_load_weights, cbt_global_iterator
 from util.logging import TimeLogger
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
-    parser.add_argument('--cbt-table-name', type=str, default='breakout-experience-replay')
+    parser.add_argument('--cbt-table-name', type=str, default='bytes-breakout-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='youngalou')
     parser.add_argument('--prefix', type=str, default='breakout')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
@@ -46,7 +46,7 @@ if __name__ == '__main__':
     #INSTANTIATE CBT TABLE AND GCS BUCKET
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     cbt_table, gcs_bucket = gcp_load_pipeline(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, args.bucket_id, credentials)
-    max_row_bytes = 8 * np.prod(VISUAL_OBS_SPEC) * args.max_steps * args.num_episodes
+    max_row_bytes = (32 * np.prod(VISUAL_OBS_SPEC) + 64) * args.max_steps * args.num_episodes
     cbt_batcher = cbt_table.mutations_batcher(flush_count=args.num_episodes, max_row_bytes=max_row_bytes)
 
     #INITIALIZE ENVIRONMENT
@@ -104,13 +104,17 @@ if __name__ == '__main__':
         
             if args.log_time is True: time_logger.log("Run Environment  ")
 
+            observations = np.asarray(observations).flatten().tobytes()
+            actions = np.asarray(actions).astype(np.uint8).tobytes()
+            rewards = np.asarray(rewards).astype(np.float32).tobytes()
+
             #BUILD PB2 OBJECTS
-            traj, info = Trajectory(), Info()
-            traj.visual_obs.extend(np.asarray(observations).flatten())
-            traj.actions.extend(actions)
-            traj.rewards.extend(rewards)
-            info.visual_obs_spec.extend(VISUAL_OBS_SPEC)
-            info.num_steps = len(actions)
+            pb2_obs, pb2_actions, pb2_rewards, pb2_info = Observations(), Actions(), Rewards(), Info()
+            pb2_obs.visual_obs = observations
+            pb2_actions.actions = actions
+            pb2_rewards.rewards = rewards
+            pb2_info.visual_obs_spec.extend(VISUAL_OBS_SPEC)
+            pb2_info.num_steps = len(actions)
 
             if args.log_time is True: time_logger.log("Data To Bytes    ")
 
@@ -119,11 +123,17 @@ if __name__ == '__main__':
             row_key = '{}_trajectory_{}'.format(args.prefix,row_key_i).encode()
             row = cbt_table.row(row_key)
             row.set_cell(column_family_id='trajectory',
-                         column='traj'.encode(),
-                         value=traj.SerializeToString())
+                         column='obs'.encode(),
+                         value=pb2_obs.SerializeToString())
+            row.set_cell(column_family_id='trajectory',
+                         column='actions'.encode(),
+                         value=pb2_actions.SerializeToString())
+            row.set_cell(column_family_id='trajectory',
+                         column='rewards'.encode(),
+                         value=pb2_rewards.SerializeToString())
             row.set_cell(column_family_id='trajectory',
                          column='info'.encode(),
-                         value=info.SerializeToString())
+                         value=pb2_info.SerializeToString())
             rows.append(row)
 
             if args.log_time is True: time_logger.log("Write Cells      ")

@@ -116,19 +116,19 @@ def cbt_global_iterator(cbt_table):
         global_i = 0  
     return global_i
 
-def cbt_read_rows(cbt_table, prefix, train_steps, global_i):
-    """ Reads N(train_steps) number of rows from cbt_table, starting from the global iterator value.
+def cbt_read_rows(cbt_table, prefix, num_rows, global_i):
+    """ Reads N(num_rows) number of rows from cbt_table, starting from the global iterator value.
 
         cbt_table -- bigtable object (default none)
         prefix -- string (default none)
-        train_steps -- integer (default none)
+        num_rows -- integer (default none)
         global_i -- integer (default none)
 
     """
-    start_i, end_i = global_i - train_steps, global_i - 1
+    start_i, end_i = global_i - num_rows, global_i - 1
     start_row_key = prefix + '_trajectory_' + str(start_i)
     end_row_key = prefix + '_trajectory_' + str(end_i)
-    partial_rows = cbt_table.read_rows(start_row_key, end_row_key, limit=train_steps, end_inclusive=True)
+    partial_rows = cbt_table.read_rows(start_row_key, end_row_key, limit=num_rows, end_inclusive=True)
     return [row for row in partial_rows]
 
 def cbt_read_row(cbt_table, prefix, row_i):
