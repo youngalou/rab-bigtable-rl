@@ -33,14 +33,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
-    parser.add_argument('--cbt-table-name', type=str, default='crane-experience-replay')
-    parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
+    parser.add_argument('--cbt-table-name', type=str, default='noprotobuf-crane-experience-replay')
+    parser.add_argument('--bucket-id', type=str, default='junwong-ny')
     parser.add_argument('--prefix', type=str, default='crane')
     parser.add_argument('--env-filename', type=str, default='envs/CraneML/OSX/CraneML_OSX.app')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000000)
     parser.add_argument('--num-episodes', type=int, default=10)
-    parser.add_argument('--max-steps', type=int, default=100)
+    parser.add_argument('--max-steps', type=int, default=1000)
     parser.add_argument('--log-time', default=False, action='store_true')
     parser.add_argument('--docker-training', type=bool, default=False)
     args = parser.parse_args()
@@ -48,8 +48,8 @@ if __name__ == '__main__':
     #INSTANTIATE CBT TABLE AND GCS BUCKET
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     cbt_table, gcs_bucket = gcp_load_pipeline(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, args.bucket_id, credentials)
-    cbt_batcher = cbt_table.mutations_batcher(flush_count=args.num_episodes, max_row_bytes=500000000)
-                                                                                          #104857600
+    max_row_bytes = 8 * np.prod(VISUAL_OBS_SPEC) * args.max_steps * args.num_episodes
+    cbt_batcher = cbt_table.mutations_batcher(flush_count=args.num_episodes, max_row_bytes=max_row_bytes)
     #INITIALIZE ENVIRONMENT
     print("-> Initializing Crane environement...")
     env = UnityEnvironmentWrapper(  environment_filename=args.env_filename,
@@ -68,16 +68,25 @@ if __name__ == '__main__':
     global_i = cbt_global_iterator(cbt_table)
     print("global_i = {}".format(global_i))
 
+    #INITIALIZE EXECUTION TIME LOGGER
     if args.log_time is True:
-        time_logger = TimeLogger(["Collect Data" , "Serialize Data", "Write Cells", "Mutate Rows"], num_cycles=args.num_episodes)
+        time_logger = TimeLogger(["Load Weights     ",
+                                  "Run Environment  ",
+                                  "Data To Bytes    ",
+                                  "Write Cells      ",
+                                  "Mutate Rows      "])
 
     #COLLECT DATA FOR CBT
     print("-> Starting data collection...")
     rows = []
     for cycle in range(args.num_cycles):
+        if args.log_time is True: time_logger.reset()
+
         gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
+
+        if args.log_time is True: time_logger.log("Load Weights     ")
+
         for i in tqdm(range(args.num_episodes), "Cycle {}".format(cycle)):
-            if args.log_time is True: time_logger.reset()
 
             #RL LOOP GENERATES A TRAJECTORY
             observations, actions, rewards = [], [], []
@@ -95,48 +104,49 @@ if __name__ == '__main__':
 
                 if done: break
                 obs = np.asarray(new_obs / 255).astype(np.float32)
-            
-            if args.log_time is True: time_logger.log(0)
+        
+            if args.log_time is True: time_logger.log("Run Environment  ")
 
-            #BUILD PB2 OBJECTS
-            traj, info = Trajectory(), Info()
-            # traj.vector_obs.extend(np.asarray(observations[0]).flatten())
-            traj.visual_obs.extend(np.asarray(observations[0]).flatten())
-            traj.actions.extend(actions)
-            traj.rewards.extend(rewards)
-            # info.vector_obs_spec.extend(observations[0].shape)
-            info.visual_obs_spec.extend(observations[0].shape)
-            info.num_steps = len(actions)
+            observations = np.asarray(observations).flatten().tobytes()
+            actions = np.asarray(actions).astype(np.uint8).tobytes()
+            rewards = np.asarray(rewards).astype(np.float32).tobytes()
 
-            if args.log_time is True: time_logger.log(1)
+            if args.log_time is True: time_logger.log("Data To Bytes    ")
 
-            #WRITE TO AND APPEND ROW
+            # SET CELLS WITH DEFAULT PYTHON ENCODING
             row_key_i = i + global_i + (cycle * args.num_episodes)
             row_key = '{}_trajectory_{}'.format(args.prefix,row_key_i).encode()
             row = cbt_table.row(row_key)
             row.set_cell(column_family_id='trajectory',
-                        column='traj'.encode(),
-                        value=traj.SerializeToString())
+                         column='obs'.encode(),
+                         value=observations)
             row.set_cell(column_family_id='trajectory',
-                        column='info'.encode(),
-                        value=info.SerializeToString())
+                         column='actions'.encode(),
+                         value=actions)
+            row.set_cell(column_family_id='trajectory',
+                         column='rewards',
+                         value=rewards)
             rows.append(row)
-            
-            if args.log_time is True: time_logger.log(2)
+
+            if args.log_time is True: time_logger.log("Write Cells      ")
         
+        #UPDATE GLOBAL ITERATOR
         gi_row = cbt_table.row('global_iterator'.encode())
         gi_row.set_cell(column_family_id='global',
                         column='i'.encode(),
                         value=struct.pack('i',row_key_i+1),
                         timestamp=datetime.datetime.utcnow())
+        
+        #ADD TRAJECTORIES AS ROWS TO BIGTABLE
         rows.append(gi_row)
         cbt_batcher.mutate_rows(rows)
         cbt_batcher.flush()
-
-        if args.log_time is True: time_logger.log(3)
-        if args.log_time is True: time_logger.print_logs()
-        
         rows = []
+
+        if args.log_time is True: time_logger.log("Mutate Rows      ")
+
         print("-> Saved trajectories {} - {}.".format(row_key_i - (args.num_episodes-1), row_key_i))
+
+        if args.log_time is True: time_logger.print_totaltime_logs()
     env.close()
     print("-> Done!")
