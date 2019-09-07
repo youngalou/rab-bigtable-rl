@@ -122,7 +122,7 @@ if __name__ == '__main__':
 
             if args.log_time is True: time_logger.log("Data To Bytes    ")
 
-            #WRITE TO AND APPEND ROW
+            # SET CELLS WITH DEFAULT PYTHON ENCODING
             row_key_i = i + global_i + (cycle * args.num_episodes)
             row_key = '{}_trajectory_{}'.format(args.prefix,row_key_i).encode()
             row = cbt_table.row(row_key)
