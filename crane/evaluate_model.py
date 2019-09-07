@@ -8,8 +8,10 @@ from google.oauth2 import service_account
 
 from models.dqn_model import DQN_Model
 from util.gcp_io import gcs_load_bucket, gcs_load_weights, cbt_global_iterator
-from util.unity_env import UnityEnvironmentWrapper
 
+import gym
+
+#SET API CREDENTIALS
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
