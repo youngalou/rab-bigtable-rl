@@ -8,8 +8,8 @@ SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 hyperparams = dict([
-    ('input_shape', [210,160,3]),
-    ('num_actions', 2),
+    ('input_shape', [224,224,3]),
+    ('num_actions', 6),
     ('conv_layer_params', ((8,4,32),(4,2,64),(3,1,64))),
     ('fc_layer_params', (512,200)),
     ('gamma', 0.9),

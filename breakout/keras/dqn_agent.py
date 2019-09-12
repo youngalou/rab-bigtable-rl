@@ -69,6 +69,11 @@ class DQN_Agent():
                                    conv_layer_params=hyperparams['conv_layer_params'],
                                    fc_layer_params=hyperparams['fc_layer_params'],
                                    learning_rate=hyperparams['learning_rate'])
+            self.target_model = DQN_Model(input_shape=self.input_shape,
+                                          num_actions=self.num_actions,
+                                          conv_layer_params=hyperparams['conv_layer_params'],
+                                          fc_layer_params=hyperparams['fc_layer_params'],
+                                          learning_rate=hyperparams['learning_rate'])
         gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
     def fill_experience_buffer(self):
@@ -138,7 +143,7 @@ class DQN_Agent():
                 ((b_obs, b_next_obs), (b_actions, b_rewards, b_next_mask)) = inputs
 
                 with tf.GradientTape() as tape:
-                    q_pred, q_next = self.model(b_obs), self.model(b_next_obs)
+                    q_pred, q_next = self.model(b_obs), self.target_model(b_next_obs)
                     one_hot_actions = tf.one_hot(b_actions, self.num_actions)
                     q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
                     q_next = tf.reduce_max(q_next, axis=-1)
@@ -163,11 +168,13 @@ class DQN_Agent():
                                            "Train Step      ",
                                            "Save Model      "])
         print("-> Starting training...")
-        for epoch in range(self.train_epochs):
-            with tf.device(self.device), self.distribution_strategy.scope():
+        with tf.device(self.device), self.distribution_strategy.scope():
+            for epoch in range(self.train_epochs):
                 dataset = self.fill_experience_buffer()
                 exp_buff = iter(dataset)
 
+                #UPDATE TARGET MODEL
+                self.target_model.set_weights(self.model.get_weights())
                 losses = []
                 for step in tqdm(range(self.train_steps), "Training epoch {}".format(epoch)):
                     loss = train_step(next(exp_buff))
