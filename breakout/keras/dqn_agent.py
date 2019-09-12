@@ -40,22 +40,30 @@ class DQN_Agent():
         self.input_shape = hyperparams['input_shape']
         self.num_actions = hyperparams['num_actions']
         self.gamma = hyperparams['gamma']
+        self.update_horizon = hyperparams['update_horizon']
+        self.future_discounts = np.power(self.gamma, range(self.update_horizon))
+        self.bootstrap_discount = np.power(self.gamma, self.update_horizon)
+        
         self.cbt_table = kwargs['cbt_table']
         self.gcs_bucket = kwargs['gcs_bucket']
         self.gcs_bucket_id = kwargs['gcs_bucket_id']
         self.prefix = kwargs['prefix']
         self.tmp_weights_filepath = kwargs['tmp_weights_filepath']
+        self.output_dir = kwargs['output_dir']
+
+        self.buffer_size = kwargs['buffer_size']
         self.batch_size = kwargs['batch_size']
         self.num_trajectories = kwargs['num_trajectories']
         self.train_epochs = kwargs['train_epochs']
         self.train_steps = kwargs['train_steps']
         self.period = kwargs['period']
-        self.output_dir = kwargs['output_dir']
+        
         self.log_time = kwargs['log_time']
         self.num_gpus = kwargs['num_gpus']
         self.tpu_name = kwargs['tpu_name']
         self.wandb = kwargs['wandb']
-        self.exp_buff = ExperienceBuffer(kwargs['buffer_size'])
+
+        self.exp_buff = ExperienceBuffer(self.buffer_size, self.update_horizon)
 
         if self.tpu_name is not None:
             self.distribution_strategy = get_distribution_strategy(distribution_strategy='tpu', tpu_address=self.tpu_name)
@@ -113,10 +121,19 @@ class DQN_Agent():
             obs = np.frombuffer(pb2_obs.visual_obs, dtype=np.float32).reshape(obs_shape)
             actions = np.frombuffer(pb2_actions.actions, dtype=np.uint8).astype(np.int32)
             rewards = np.frombuffer(pb2_rewards.rewards, dtype=np.float32)
+            discounted_future_rewards = []
+            for i in range(info.num_steps):
+                end_i = i + self.update_horizon
+                if end_i <= info.num_steps:
+                    horizon_rewards = rewards[i:end_i]
+                else:
+                    horizon_rewards = np.append(rewards[i:], np.zeros(end_i-info.num_steps))
+                discounted_future_rewards.append(np.sum(horizon_rewards * self.future_discounts))
+            discounted_future_rewards = np.asarray(discounted_future_rewards).astype(np.float32)
 
             if self.log_time is True: self.time_logger.log("Format Data     ")
 
-            self.exp_buff.add_trajectory(obs, actions, rewards, info.num_steps)
+            self.exp_buff.add_trajectory(obs, actions, discounted_future_rewards, info.num_steps)
 
             if self.log_time is True: self.time_logger.log("Add To Exp_Buff ")
         self.exp_buff.preprocess()
@@ -146,8 +163,8 @@ class DQN_Agent():
                     q_pred, q_next = self.model(b_obs), self.target_model(b_next_obs)
                     one_hot_actions = tf.one_hot(b_actions, self.num_actions)
                     q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
-                    q_next = tf.reduce_max(q_next, axis=-1)
-                    q_target = b_rewards + (tf.constant(self.gamma, dtype=tf.float32) * q_next)
+                    q_next = tf.reduce_max(q_next, axis=-1) * b_next_mask
+                    q_target = b_rewards + (tf.constant(self.bootstrap_discount, dtype=tf.float32) * q_next)
                     mse = self.model.loss(q_target, q_pred)
                     loss = tf.reduce_sum(mse)
                 
@@ -188,11 +205,11 @@ class DQN_Agent():
                     self.wandb.log({"Epoch": epoch,
                                     "Mean Loss": mean_loss})
 
-            if epoch > 0 and epoch % self.period == 0:
-                model_filename = self.prefix + '_model.h5'
-                gcs_save_weights(self.model, self.gcs_bucket, self.tmp_weights_filepath, model_filename)
+                if epoch > 0 and epoch % self.period == 0:
+                    model_filename = self.prefix + '_model.h5'
+                    gcs_save_weights(self.model, self.gcs_bucket, self.tmp_weights_filepath, model_filename)
 
-            if self.log_time is True: self.time_logger.log("Save Model      ")
+                if self.log_time is True: self.time_logger.log("Save Model      ")
 
-            if self.log_time is True: self.time_logger.print_totaltime_logs()
+                if self.log_time is True: self.time_logger.print_totaltime_logs()
         print("-> Done!")

@@ -75,7 +75,7 @@ class DQN_Model(tf.keras.Model):
         return self.step(inputs)
 
 class ExperienceBuffer():
-    def __init__(self, max_size):
+    def __init__(self, max_size, update_horizon):
         self.obs, self.actions, self.rewards, self.next_obs, self.next_mask = \
             [], [], [], [], []
         
@@ -83,12 +83,13 @@ class ExperienceBuffer():
             [], [], [], [], []
         
         self.max_size = max_size
+        self.update_horizon = update_horizon
         self.size = 0
 
     def add_trajectory(self, obs, actions, rewards, num_steps):
-        next_obs = np.roll(obs, shift=-1, axis=0)
-        next_mask = np.ones(num_steps)
-        next_mask[-1] = 0
+        shift = self.update_horizon * -1
+        next_obs = np.roll(obs, shift=shift, axis=0)
+        next_mask = np.append(np.ones(num_steps-self.update_horizon), np.zeros(self.update_horizon))
         next_mask = next_mask.astype(np.float32)
 
         self.append(obs, actions, rewards, next_obs, next_mask)
@@ -109,4 +110,4 @@ class ExperienceBuffer():
         self.next_mask = np.concatenate(self.next_mask, axis=0)
 
     def reset(self):
-        self.__init__(self.max_size)
+        self.__init__(self.max_size, self.update_horizon)

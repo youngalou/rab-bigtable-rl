@@ -13,6 +13,7 @@ hyperparams = dict([
     ('conv_layer_params', ((8,4,32),(4,2,64),(3,1,64))),
     ('fc_layer_params', (512,200)),
     ('gamma', 0.9),
+    ('update_horizon', 5),
     ('learning_rate', 0.00042)
 ])
 
@@ -24,13 +25,13 @@ if __name__ == '__main__':
     parser.add_argument('--bucket-id', type=str, default='youngalou')
     parser.add_argument('--prefix', type=str, default='breakout')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
+    parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     parser.add_argument('--buffer-size', type=int, default=1000)
     parser.add_argument('--batch-size', type=int, default=256)
     parser.add_argument('--num-trajectories', type=int, default=10)
     parser.add_argument('--train-epochs', type=int, default=1000000)
     parser.add_argument('--train-steps', type=int, default=100)
     parser.add_argument('--period', type=int, default=1)
-    parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     parser.add_argument('--log-time', default=False, action='store_true')
     parser.add_argument('--num-gpus', type=int, default=0)
     parser.add_argument('--tpu-name', type=str, default='youngalou')
