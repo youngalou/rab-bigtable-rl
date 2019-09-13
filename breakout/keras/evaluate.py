@@ -16,17 +16,17 @@ SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 #MODEL HYPERPARAMETERS
-VECTOR_OBS_SPEC = [4]
+VISUAL_OBS_SPEC = [210,160,3]
 NUM_ACTIONS=2
-FC_LAYER_PARAMS=(200,)
+FC_LAYER_PARAMS=(512,)
 LEARNING_RATE=0.00042
 
 if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
-    parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
+    parser = argparse.ArgumentParser('Breakout Evaluation Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
-    parser.add_argument('--prefix', type=str, default='cartpole')
+    parser.add_argument('--prefix', type=str, default='breakout')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000)
     parser.add_argument('--num-episodes', type=int, default=10)
@@ -37,16 +37,17 @@ if __name__ == '__main__':
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     gcs_bucket = gcs_load_bucket(args.gcp_project_id, args.bucket_id, credentials)
 
-    #LOAD MODEL
-    model = DQN_Model(input_shape=VECTOR_OBS_SPEC,
-                      num_actions=NUM_ACTIONS,
-                      fc_layer_params=FC_LAYER_PARAMS,
-                      learning_rate=LEARNING_RATE)
-
     #INITIALIZE ENVIRONMENT
     print("-> Initializing Gym environement...")
-    env = gym.make('CartPole-v0')
+    env = gym.make('Breakout-v0')
     print("-> Environment intialized.")
+
+    #LOAD MODEL
+    model = DQN_Model(input_shape=env.observation_space.shape,
+                      num_actions=env.action_space.n,
+                      conv_layer_params=CONV_LAYER_PARAMS,
+                      fc_layer_params=FC_LAYER_PARAMS,
+                      learning_rate=LEARNING_RATE)
 
     #COLLECT DATA FOR CBT
     print("-> Starting evaluation...")

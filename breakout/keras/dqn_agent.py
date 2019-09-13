@@ -175,7 +175,7 @@ class DQN_Agent():
                 return mse
 
             dist_losses = self.distribution_strategy.experimental_run_v2(step_fn, args=(dist_inputs,))
-            mean_loss = self.distribution_strategy.reduce(tf.distribute.ReduceOp.MEAN, per_example_losses, axis=None)
+            mean_loss = self.distribution_strategy.reduce(tf.distribute.ReduceOp.MEAN, dist_losses, axis=None)
             return mean_loss
 
         if self.log_time is True:
@@ -203,7 +203,6 @@ class DQN_Agent():
                 
                 if self.wandb is not None:
                     mean_loss = np.mean(losses)
-                    tf.summary.scalar("Mean Loss", mean_loss, epoch)
                     self.wandb.log({"Epoch": epoch,
                                     "Mean Loss": mean_loss,
                                     "Mean Reward": mean_reward})
