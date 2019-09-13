@@ -81,7 +81,7 @@ if __name__ == '__main__':
         if args.log_time is True: time_logger.reset()
 
         if cycle % args.update_interval == 0:
-+            gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
+            gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
 
         if args.log_time is True: time_logger.log("Load Weights     ")
 
