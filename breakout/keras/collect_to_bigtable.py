@@ -40,6 +40,7 @@ if __name__ == '__main__':
     parser.add_argument('--num-cycles', type=int, default=1000000)
     parser.add_argument('--num-episodes', type=int, default=1)
     parser.add_argument('--max-steps', type=int, default=100)
+    parser.add_argument('--update-interval', type=int, default=10)
     parser.add_argument('--log-time', default=False, action='store_true')
     args = parser.parse_args()
 
@@ -79,7 +80,8 @@ if __name__ == '__main__':
     for cycle in range(args.num_cycles):
         if args.log_time is True: time_logger.reset()
 
-        gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
+        if cycle % args.update_interval == 0:
++            gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
 
         if args.log_time is True: time_logger.log("Load Weights     ")
 
