@@ -192,6 +192,8 @@ class DQN_Agent():
                 dataset, mean_reward = self.fill_experience_buffer()
                 exp_buff = iter(dataset)
 
+                if self.log_time is True: self.time_logger.set_start()
+
                 #UPDATE TARGET MODEL
                 self.target_model.set_weights(self.model.get_weights())
                 losses = []

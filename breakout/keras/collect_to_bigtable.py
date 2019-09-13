@@ -120,7 +120,7 @@ if __name__ == '__main__':
 
             #WRITE TO AND APPEND ROW
             row_key_i = i + global_i + (cycle * args.num_episodes)
-            row_key = '{}_trajectory_{}'.format(args.prefix,row_key_i).encode()
+            row_key = '{}_trajectory_{:05d}'.format(args.prefix,row_key_i).encode()
             row = cbt_table.row(row_key)
             row.set_cell(column_family_id='trajectory',
                          column='obs'.encode(),

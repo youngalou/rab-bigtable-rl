@@ -126,8 +126,8 @@ def cbt_read_rows(cbt_table, prefix, num_rows, global_i):
 
     """
     start_i, end_i = global_i - num_rows, global_i - 1
-    start_row_key = prefix + '_trajectory_' + str(start_i)
-    end_row_key = prefix + '_trajectory_' + str(end_i)
+    start_row_key = prefix + '_trajectory_' + '{:05d}'.format(start_i)
+    end_row_key = prefix + '_trajectory_' + '{:05d}'.format(end_i)
     partial_rows = cbt_table.read_rows(start_row_key, end_row_key, limit=num_rows, end_inclusive=True)
     return [row for row in partial_rows]
 
