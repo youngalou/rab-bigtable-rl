@@ -4,19 +4,17 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras.layers import Conv2D, Dense, Flatten
 
-class Custom_Convs(tf.keras.Model):
+class CustomConvs(tf.keras.Model):
     def __init__(self,
                  conv_layer_params,
-                 activation="relu"):
-        super().__init__(name='')
-        tf.keras.backend.set_floatx('float32')
-
-        self.conv_layers = [Conv2D(padding="same",
+                 activation='relu'):
+        super().__init__()
+        self.conv_layers = [Conv2D(padding='same',
                                     kernel_size=k,
                                     strides=s,
                                     filters=f,
                                     activation=activation,
-                                    name="conv_{}".format(i))
+                                    name='conv_{}'.format(i))
                       for i,(k,s,f) in enumerate(conv_layer_params)]
         self.flatten = Flatten()
     
@@ -25,6 +23,35 @@ class Custom_Convs(tf.keras.Model):
             inputs = conv_layer(inputs)
         embedding = self.flatten(inputs)
         return embedding
+
+class ValueHead(tf.keras.Model):
+    def __init__(self,
+                 fc_layer_params,
+                 activation='relu'):
+        super().__init__()
+        self.fc_layers = [Dense(neurons, activation='relu', name='value_fc_layer_{}'.format(i)) for i,(neurons) in enumerate(fc_layer_params)]
+        self.value_output = Dense(1, name='value_output')
+
+    def call(self, inputs):
+        for layer in self.fc_layers:
+            inputs = layer(inputs)
+        return self.value_output(inputs)
+
+class AdvantageHead(tf.keras.Model):
+    def __init__(self,
+                 fc_layer_params,
+                 num_actions=None,
+                 activation='relu'):
+        super().__init__()
+        self.fc_layers = [Dense(neurons, activation='relu', name='advantage_fc_layer_{}'.format(i)) for i,(neurons) in enumerate(fc_layer_params)]
+        self.advantage_output = Dense(num_actions, name='advantage_output')
+
+    def call(self, inputs):
+        for layer in self.fc_layers:
+            inputs = layer(inputs)
+        return self.advantage_output(inputs)
+
+
 
 class DQN_Model(tf.keras.Model):
     def __init__(self,
@@ -35,11 +62,11 @@ class DQN_Model(tf.keras.Model):
                  learning_rate=0.00042):
         super().__init__()
         if conv_layer_params is not None:
-            self.convs = Custom_Convs(conv_layer_params)
+            self.convs = CustomConvs(conv_layer_params)
         else: self.convs = None
         if fc_layer_params is not None:
-            self.fc_layers = [Dense(neurons, activation="relu", name="fc_layer_{}".format(i)) for i,(neurons) in enumerate(fc_layer_params)]
-        self.q_layer = Dense(num_actions, name='output')
+            self.value_head = ValueHead(fc_layer_params)
+            self.advantage_head = AdvantageHead(fc_layer_params, num_actions)
 
         self.step(np.zeros(input_shape, dtype=np.float32))
         self.loss = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.SUM)
@@ -51,10 +78,10 @@ class DQN_Model(tf.keras.Model):
     def call(self, inputs):
         if self.convs is not None:
             inputs = self.convs(inputs)
-        for layer in self.fc_layers:
-            inputs = layer(inputs)
-        logits = self.q_layer(inputs)
-        return tf.cast(logits, dtype=tf.float32)
+        value = self.value_head(inputs)
+        advantage = self.advantage_head(inputs)
+        output = value + (advantage - tf.reduce_mean(advantage))
+        return tf.cast(output, dtype=tf.float32)
     
     def step(self, inputs):
         inputs = np.expand_dims(inputs, 0)
