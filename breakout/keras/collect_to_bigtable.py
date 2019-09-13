@@ -24,7 +24,7 @@ SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 VISUAL_OBS_SPEC = [210,160,3]
 NUM_ACTIONS=2
 CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
-FC_LAYER_PARAMS=(512,200)
+FC_LAYER_PARAMS=(512,)
 LEARNING_RATE=0.00042
 EPSILON = 0.5
 
@@ -79,7 +79,7 @@ if __name__ == '__main__':
     for cycle in range(args.num_cycles):
         if args.log_time is True: time_logger.reset()
 
-        # gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
+        gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
 
         if args.log_time is True: time_logger.log("Load Weights     ")
 

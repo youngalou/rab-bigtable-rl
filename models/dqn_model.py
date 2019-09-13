@@ -1,6 +1,6 @@
+import os
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0' 
 import numpy as np
-# import os
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
 import tensorflow as tf
 from tensorflow.keras.layers import Conv2D, Dense, Flatten
 
@@ -50,8 +50,6 @@ class AdvantageHead(tf.keras.Model):
         for layer in self.fc_layers:
             inputs = layer(inputs)
         return self.advantage_output(inputs)
-
-
 
 class DQN_Model(tf.keras.Model):
     def __init__(self,

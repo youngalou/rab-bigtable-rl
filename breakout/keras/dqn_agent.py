@@ -1,9 +1,9 @@
 import os
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0' 
 import argparse
 import datetime
 from tqdm import tqdm
 import numpy as np
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
 import tensorflow as tf
 
 from protobuf.bytes_experience_replay_pb2 import Observations, Actions, Rewards, Info
@@ -92,6 +92,7 @@ class DQN_Agent():
 
         """
         self.exp_buff.reset()
+        total_rewards = []
 
         if self.log_time is True: self.time_logger.reset()
 
@@ -121,6 +122,7 @@ class DQN_Agent():
             obs = np.frombuffer(pb2_obs.visual_obs, dtype=np.float32).reshape(obs_shape)
             actions = np.frombuffer(pb2_actions.actions, dtype=np.uint8).astype(np.int32)
             rewards = np.frombuffer(pb2_rewards.rewards, dtype=np.float32)
+            total_rewards.append(np.sum(rewards))
             discounted_future_rewards = []
             for i in range(info.num_steps):
                 end_i = i + self.update_horizon
@@ -147,7 +149,7 @@ class DQN_Agent():
 
         if self.log_time is True: self.time_logger.log("To Dataset      ")
 
-        return dist_dataset
+        return dist_dataset, np.mean(total_rewards)
 
     def train(self):
         """
@@ -167,12 +169,12 @@ class DQN_Agent():
                     q_target = b_rewards + (tf.constant(self.bootstrap_discount, dtype=tf.float32) * q_next)
                     mse = self.model.loss(q_target, q_pred)
                     loss = tf.reduce_sum(mse)
-                
+
                 total_grads = tape.gradient(loss, self.model.trainable_weights)
                 self.model.opt.apply_gradients(list(zip(total_grads, self.model.trainable_weights)))
                 return mse
 
-            per_example_losses = self.distribution_strategy.experimental_run_v2(step_fn, args=(dist_inputs,))
+            dist_losses = self.distribution_strategy.experimental_run_v2(step_fn, args=(dist_inputs,))
             mean_loss = self.distribution_strategy.reduce(tf.distribute.ReduceOp.MEAN, per_example_losses, axis=None)
             return mean_loss
 
@@ -187,7 +189,7 @@ class DQN_Agent():
         print("-> Starting training...")
         with tf.device(self.device), self.distribution_strategy.scope():
             for epoch in range(self.train_epochs):
-                dataset = self.fill_experience_buffer()
+                dataset, mean_reward = self.fill_experience_buffer()
                 exp_buff = iter(dataset)
 
                 #UPDATE TARGET MODEL
@@ -203,7 +205,8 @@ class DQN_Agent():
                     mean_loss = np.mean(losses)
                     tf.summary.scalar("Mean Loss", mean_loss, epoch)
                     self.wandb.log({"Epoch": epoch,
-                                    "Mean Loss": mean_loss})
+                                    "Mean Loss": mean_loss,
+                                    "Mean Reward": mean_reward})
 
                 if epoch > 0 and epoch % self.period == 0:
                     model_filename = self.prefix + '_model.h5'
