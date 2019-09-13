@@ -187,9 +187,9 @@ class DQN_Agent():
                                            "Train Step      ",
                                            "Save Model      "])
         print("-> Starting training...")
-        for epoch in range(self.train_epochs):
-            dataset, mean_reward = self.fill_experience_buffer()
-            with tf.device(self.device), self.distribution_strategy.scope():
+        with tf.device(self.device), self.distribution_strategy.scope():
+            for epoch in range(self.train_epochs):
+                dataset, mean_reward = self.fill_experience_buffer()
                 exp_buff = iter(dataset)
 
                 #UPDATE TARGET MODEL
@@ -201,17 +201,17 @@ class DQN_Agent():
 
                     if self.log_time is True: self.time_logger.log("Train Step      ")
                 
-            if self.wandb is not None:
-                mean_loss = np.mean(losses)
-                self.wandb.log({"Epoch": epoch,
-                                "Mean Loss": mean_loss,
-                                "Mean Reward": mean_reward})
+                if self.wandb is not None:
+                    mean_loss = np.mean(losses)
+                    self.wandb.log({"Epoch": epoch,
+                                    "Mean Loss": mean_loss,
+                                    "Mean Reward": mean_reward})
 
-            if epoch > 0 and epoch % self.period == 0:
-                model_filename = self.prefix + '_model.h5'
-                gcs_save_weights(self.model, self.gcs_bucket, self.tmp_weights_filepath, model_filename)
+                if epoch > 0 and epoch % self.period == 0:
+                    model_filename = self.prefix + '_model.h5'
+                    gcs_save_weights(self.model, self.gcs_bucket, self.tmp_weights_filepath, model_filename)
 
-            if self.log_time is True: self.time_logger.log("Save Model      ")
+                if self.log_time is True: self.time_logger.log("Save Model      ")
 
-            if self.log_time is True: self.time_logger.print_totaltime_logs()
+                if self.log_time is True: self.time_logger.print_totaltime_logs()
         print("-> Done!")
