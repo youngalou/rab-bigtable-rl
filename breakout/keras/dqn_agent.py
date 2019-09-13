@@ -207,7 +207,7 @@ class DQN_Agent():
                                     "Mean Loss": mean_loss,
                                     "Mean Reward": mean_reward})
 
-                if epoch > 0 and epoch % self.period == 0:
+                if self.period > 0 and epoch % self.period == 0:
                     model_filename = self.prefix + '_model.h5'
                     gcs_save_weights(self.model, self.gcs_bucket, self.tmp_weights_filepath, model_filename)
 
