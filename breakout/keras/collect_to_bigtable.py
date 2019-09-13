@@ -32,7 +32,7 @@ if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
-    parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
+    parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable-production')
     parser.add_argument('--cbt-table-name', type=str, default='bytes-breakout-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='youngalou')
     parser.add_argument('--prefix', type=str, default='breakout')
