@@ -17,7 +17,7 @@ SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 #MODEL HYPERPARAMETERS
 VISUAL_OBS_SPEC = [210,160,3]
-NUM_ACTIONS=2
+NUM_ACTIONS=4
 CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
 FC_LAYER_PARAMS=(512,)
 LEARNING_RATE=0.00042
@@ -56,8 +56,7 @@ if __name__ == '__main__':
         gcs_load_weights(model, gcs_bucket, args.prefix, args.tmp_weights_filepath)
         total_reward = 0
         for i in tqdm(range(args.num_episodes), "Cycle {}".format(cycle)):
-            observations, actions, rewards = [], [], []
-            obs = np.array(env.reset())
+            obs = np.asarray(env.reset()/255).astype(np.float32)
             reward = 0
             done = False
             
@@ -68,13 +67,9 @@ if __name__ == '__main__':
                 action = model.step(obs)
                 new_obs, reward, done, info = env.step(action)
 
-                observations.append(obs)
-                actions.append(action)
-                rewards.append(reward)
-
                 total_reward += reward
                 if done: break
-                obs = np.array(new_obs)
+                obs = np.asarray(new_obs/255).astype(np.float32)
         print("Average reward: {}".format(total_reward / args.num_episodes))
     env.close()
     print("-> Done!")

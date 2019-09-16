@@ -47,7 +47,7 @@ if __name__ == '__main__':
     #INSTANTIATE CBT TABLE AND GCS BUCKET
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     cbt_table, gcs_bucket = gcp_load_pipeline(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, args.bucket_id, credentials)
-    max_row_bytes = (4 * np.prod(VISUAL_OBS_SPEC) + 4 + 64) * args.max_steps * args.num_episodes
+    max_row_bytes = (4 * np.prod(VISUAL_OBS_SPEC) + 4 + 64)
     cbt_batcher = cbt_table.mutations_batcher(flush_count=args.num_episodes, max_row_bytes=max_row_bytes)
 
     #INITIALIZE ENVIRONMENT
@@ -85,60 +85,54 @@ if __name__ == '__main__':
 
         if args.log_time is True: time_logger.log("Load Weights     ")
 
-        for i in tqdm(range(args.num_episodes), "Cycle {}".format(cycle)):
-
+        print("Collecting cycle {}:".format(cycle))
+        for episode in range(args.num_episodes):
             #RL LOOP GENERATES A TRAJECTORY
-            observations, actions, rewards = [], [], []
             obs = np.asarray(env.reset() / 255).astype(np.float32)
             reward = 0
             done = False
             
-            for _ in range(args.max_steps):
+            for step in tqdm(range(args.max_steps), "Episode {}".format(episode)):
                 action = model.step_epsilon_greedy(obs, EPSILON)
                 new_obs, reward, done, info = env.step(action)
-
-                observations.append(obs)
-                actions.append(action)
-                rewards.append(reward)
 
                 if done: break
                 obs = np.asarray(new_obs / 255).astype(np.float32)
         
-            if args.log_time is True: time_logger.log("Run Environment  ")
+                if args.log_time is True: time_logger.log("Run Environment  ")
 
-            observations = np.asarray(observations).flatten().tobytes()
-            actions = np.asarray(actions).astype(np.uint8).tobytes()
-            rewards = np.asarray(rewards).astype(np.float32).tobytes()
+                observation = obs.flatten().tobytes()
+                action = np.asarray(action).astype(np.uint8).tobytes()
+                reward = np.asarray(reward).astype(np.float32).tobytes()
 
-            #BUILD PB2 OBJECTS
-            pb2_obs, pb2_actions, pb2_rewards, pb2_info = Observations(), Actions(), Rewards(), Info()
-            pb2_obs.visual_obs = observations
-            pb2_actions.actions = actions
-            pb2_rewards.rewards = rewards
-            pb2_info.visual_obs_spec.extend(VISUAL_OBS_SPEC)
-            pb2_info.num_steps = len(actions)
+                #BUILD PB2 OBJECTS
+                pb2_obs, pb2_actions, pb2_rewards, pb2_info = Observations(), Actions(), Rewards(), Info()
+                pb2_obs.visual_obs = observation
+                pb2_actions.actions = action
+                pb2_rewards.rewards = reward
+                pb2_info.visual_obs_spec.extend(VISUAL_OBS_SPEC)
 
-            if args.log_time is True: time_logger.log("Data To Bytes    ")
+                if args.log_time is True: time_logger.log("Data To Bytes    ")
 
-            #WRITE TO AND APPEND ROW
-            row_key_i = i + global_i + (cycle * args.num_episodes)
-            row_key = '{}_trajectory_{:05d}'.format(args.prefix,row_key_i).encode()
-            row = cbt_table.row(row_key)
-            row.set_cell(column_family_id='trajectory',
-                         column='obs'.encode(),
-                         value=pb2_obs.SerializeToString())
-            row.set_cell(column_family_id='trajectory',
-                         column='actions'.encode(),
-                         value=pb2_actions.SerializeToString())
-            row.set_cell(column_family_id='trajectory',
-                         column='rewards'.encode(),
-                         value=pb2_rewards.SerializeToString())
-            row.set_cell(column_family_id='trajectory',
-                         column='info'.encode(),
-                         value=pb2_info.SerializeToString())
-            rows.append(row)
+                #WRITE TO AND APPEND ROW
+                row_key_i = episode + global_i + (cycle * args.num_episodes)
+                row_key = 'traj_{:05d}_step_{:05d}'.format(row_key_i, step).encode()
+                row = cbt_table.row(row_key)
+                row.set_cell(column_family_id='trajectory',
+                            column='obs'.encode(),
+                            value=pb2_obs.SerializeToString())
+                row.set_cell(column_family_id='trajectory',
+                            column='actions'.encode(),
+                            value=pb2_actions.SerializeToString())
+                row.set_cell(column_family_id='trajectory',
+                            column='rewards'.encode(),
+                            value=pb2_rewards.SerializeToString())
+                row.set_cell(column_family_id='trajectory',
+                            column='info'.encode(),
+                            value=pb2_info.SerializeToString())
+                rows.append(row)
 
-            if args.log_time is True: time_logger.log("Write Cells      ")
+                if args.log_time is True: time_logger.log("Write Cells      ")
         
         #UPDATE GLOBAL ITERATOR
         gi_row = cbt_table.row('global_iterator'.encode())

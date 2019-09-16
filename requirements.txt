@@ -3,7 +3,7 @@ tensorflow==2.0.0-beta1
 tensorboard==1.14.0
 numpy==1.14.5
 protobuf
-gym
+gym[atari]
 tqdm
 google-cloud-bigtable
 google-cloud-storage
