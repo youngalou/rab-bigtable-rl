@@ -18,7 +18,7 @@ from util.logging import TimeLogger
 from util.unity_env import UnityEnvironmentWrapper
 
 # Retrieve environment variables
-POD_NAME = os.environ.get('HOSTNAME')
+# POD_NAME = os.environ.get('HOSTNAME')
 
 #SET API CREDENTIALS
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
@@ -75,10 +75,6 @@ if __name__ == '__main__':
                       fc_layer_params=FC_LAYER_PARAMS,
                       learning_rate=LEARNING_RATE)
                       
-    #GLOBAL ITERATOR
-    global_i = cbt_global_iterator(cbt_table)
-    print("global_i = {}".format(global_i))
-
     #INITIALIZE EXECUTION TIME LOGGER
     if args.log_time is True:
         time_logger = TimeLogger(["Load Weights     ",
@@ -100,6 +96,9 @@ if __name__ == '__main__':
 
         print("Collecting cycle {}:".format(cycle))
         for episode in range(args.num_episodes):
+            #UPDATE GLOBAL ITERATOR
+            global_i = cbt_global_iterator(cbt_table)
+
             #RL LOOP GENERATES A TRAJECTORY
             obs = np.asarray(env.reset() / 255).astype(np.float32)
             reward = 0
@@ -129,8 +128,7 @@ if __name__ == '__main__':
 
                 #WRITE TO AND APPEND ROW
                 row_key_i = episode + global_i + (cycle * args.num_episodes)
-                row_key = 'traj_pod_{}_{:05d}_step_{:05d}'.format(POD_NAME ,row_key_i, step).encode()
-                # logger.info("==> row_key: {}".format(row_key))
+                row_key = 'traj_{:05d}_step_{:05d}'.format(row_key_i, step).encode()
                 row = cbt_table.row(row_key)
                 row.set_cell(column_family_id='trajectory',
                             column='obs'.encode(),
@@ -147,13 +145,6 @@ if __name__ == '__main__':
                 rows.append(row)
 
                 if args.log_time is True: time_logger.log("Write Cells      ")
-        
-        #UPDATE GLOBAL ITERATOR
-        gi_row = cbt_table.row('global_iterator'.encode())
-        gi_row.set_cell(column_family_id='global',
-                        column='i'.encode(),
-                        value=struct.pack('i',row_key_i+1),
-                        timestamp=datetime.datetime.utcnow())
         
         #ADD TRAJECTORIES AS ROWS TO BIGTABLE
         rows.append(gi_row)
