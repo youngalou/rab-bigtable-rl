@@ -137,13 +137,6 @@ if __name__ == '__main__':
 
                 if args.log_time is True: time_logger.log("Write Cells      ")
         
-        #UPDATE GLOBAL ITERATOR
-        gi_row = cbt_table.row('global_iterator'.encode())
-        gi_row.set_cell(column_family_id='global',
-                        column='i'.encode(),
-                        value=struct.pack('i',row_key_i+1),
-                        timestamp=datetime.datetime.utcnow())
-        
         #ADD ROWS TO BIGTABLE
         rows.append(gi_row)
         cbt_batcher.mutate_rows(rows)
