@@ -1,5 +1,10 @@
 #!/bin/bash
+echo "Host name: " $HOSTNAME
+
+echo "=> Pull the newest update from git"
 git pull
+
+echo "=> Run crane/collect_to_bigtable..."
 python3 -m \
     crane.collect_to_bigtable \
     --docker-training=True \
