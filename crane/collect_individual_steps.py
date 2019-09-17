@@ -51,9 +51,9 @@ if __name__ == '__main__':
     parser.add_argument('--docker-training', type=bool, default=False)
     args = parser.parse_args()
 
-    # logging
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger("crane")
+    # logging for debugger
+    # logging.basicConfig(level=logging.INFO)
+    # logger = logging.getLogger("crane")
 
     #INSTANTIATE CBT TABLE AND GCS BUCKET
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
@@ -130,7 +130,7 @@ if __name__ == '__main__':
                 #WRITE TO AND APPEND ROW
                 row_key_i = episode + global_i + (cycle * args.num_episodes)
                 row_key = 'traj_pod_{}_{:05d}_step_{:05d}'.format(POD_NAME ,row_key_i, step).encode()
-                logger.info("==> row_key: {}".format(row_key))
+                # logger.info("==> row_key: {}".format(row_key))
                 row = cbt_table.row(row_key)
                 row.set_cell(column_family_id='trajectory',
                             column='obs'.encode(),
