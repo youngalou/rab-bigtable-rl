@@ -21,10 +21,6 @@ import gym
 # Retrieve environment variables
 POD_NAME = os.environ.get('HOSTNAME')
 
-# logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("crane")
-
 #SET API CREDENTIALS
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
@@ -55,6 +51,10 @@ if __name__ == '__main__':
     parser.add_argument('--log-time', default=False, action='store_true')
     parser.add_argument('--docker-training', type=bool, default=False)
     args = parser.parse_args()
+
+    # logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger("crane")
 
     #INSTANTIATE CBT TABLE AND GCS BUCKET
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)

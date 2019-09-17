@@ -1,11 +1,16 @@
 #!/bin/bash
-echo "Host name: " $HOSTNAME
+export COLLECTION_PY=crane.collect_individual_steps
+export ENV_FILENAME=CraneML_0813.x86_64
 
-echo "=> Pull the newest update from git"
+echo "==> Host name: " $HOSTNAME
+
+echo "==> Pull the newest update from git"
 git pull
 
-echo "=> Run crane/collect_to_bigtable..."
+echo "==> Run: " $COLLECTION_PY
+echo "==> env file: " $ENV_FILENAME
+
 python3 -m \
-    crane.collect_individual_steps \
+    $COLLECTION_PY \
     --docker-training=True \
-    --env-filename=CraneML_0813.x86_64
+    --env-filename=$ENV_FILENAME
