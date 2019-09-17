@@ -16,9 +16,6 @@ from util.logging import TimeLogger
 
 import gym
 
-# Retrieve environment variables
-POD_NAME = os.environ.get('HOSTNAME')
-
 #SET API CREDENTIALS
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
@@ -122,8 +119,7 @@ if __name__ == '__main__':
 
                 #WRITE TO AND APPEND ROW
                 row_key_i = episode + global_i + (cycle * args.num_episodes)
-                row_key = 'traj_pod_{}_{:05d}_step_{:05d}'.format(POD_NAME ,row_key_i, step).encode()
-                printf("==> row_key: {}".format(row_key))
+                row_key = 'traj_{:05d}_step_{:05d}'.format(row_key_i, step).encode()
                 row = cbt_table.row(row_key)
                 row.set_cell(column_family_id='trajectory',
                             column='obs'.encode(),
