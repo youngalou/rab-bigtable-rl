@@ -15,8 +15,7 @@ from protobuf.bytes_experience_replay_pb2 import Observations, Actions, Rewards,
 from models.dqn_model import DQN_Model
 from util.gcp_io import gcp_load_pipeline, gcs_load_weights, cbt_global_iterator
 from util.logging import TimeLogger
-
-import gym
+from util.unity_env import UnityEnvironmentWrapper
 
 # Retrieve environment variables
 POD_NAME = os.environ.get('HOSTNAME')
