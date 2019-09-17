@@ -76,7 +76,6 @@ if __name__ == '__main__':
 
     #COLLECT DATA FOR CBT
     print("-> Starting data collection...")
-    rows = []
     for cycle in range(args.num_cycles):
         if args.log_time is True: time_logger.reset()
 
@@ -85,8 +84,12 @@ if __name__ == '__main__':
 
         if args.log_time is True: time_logger.log("Load Weights     ")
 
+        rows = []
         print("Collecting cycle {}:".format(cycle))
         for episode in range(args.num_episodes):
+            #UPDATE GLOBAL ITERATOR
+            global_i = cbt_global_iterator(cbt_table)
+
             #RL LOOP GENERATES A TRAJECTORY
             obs = np.asarray(env.reset() / 255).astype(np.float32)
             reward = 0
@@ -101,7 +104,7 @@ if __name__ == '__main__':
         
                 if args.log_time is True: time_logger.log("Run Environment  ")
 
-                observation = obs.flatten().tobytes()
+                observation = np.expand_dims(obs, axis=0).flatten().tobytes()
                 action = np.asarray(action).astype(np.uint8).tobytes()
                 reward = np.asarray(reward).astype(np.float32).tobytes()
 
@@ -141,11 +144,10 @@ if __name__ == '__main__':
                         value=struct.pack('i',row_key_i+1),
                         timestamp=datetime.datetime.utcnow())
         
-        #ADD TRAJECTORIES AS ROWS TO BIGTABLE
+        #ADD ROWS TO BIGTABLE
         rows.append(gi_row)
         cbt_batcher.mutate_rows(rows)
         cbt_batcher.flush()
-        rows = []
 
         if args.log_time is True: time_logger.log("Mutate Rows      ")
 

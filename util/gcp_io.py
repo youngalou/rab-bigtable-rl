@@ -105,15 +105,15 @@ def cbt_global_iterator(cbt_table):
     gi_row = cbt_table.read_row('global_iterator'.encode())
     if gi_row is not None:
         global_i = gi_row.cells['global']['i'.encode()][0].value
-        global_i = struct.unpack('i', global_i)[0]
+        global_i = struct.unpack('i', global_i)[0] + 1
     else:
-        gi_row = cbt_table.row('global_iterator'.encode())
-        gi_row.set_cell(column_family_id='global',
-                        column='i'.encode(),
-                        value=struct.pack('i',0),
-                        timestamp=datetime.datetime.utcnow())
-        cbt_table.mutate_rows([gi_row])
-        global_i = 0  
+        global_i = 0
+    gi_row = cbt_table.row('global_iterator'.encode())
+    gi_row.set_cell(column_family_id='global',
+                    column='i'.encode(),
+                    value=struct.pack('i',global_i),
+                    timestamp=datetime.datetime.utcnow())
+    cbt_table.mutate_rows([gi_row])
     return global_i
 
 def cbt_read_rows(cbt_table, prefix, num_rows, global_i):
@@ -141,3 +141,18 @@ def cbt_read_row(cbt_table, prefix, row_i):
     row_key = prefix + '_trajectory_' + str(row_i)
     row = cbt_table.read_row(row_key)
     return row
+
+def cbt_read_trajectory(cbt_table, traj_i, global_i):
+    """ Reads N(num_rows) number of rows from cbt_table, starting from the global iterator value.
+
+        cbt_table -- bigtable object (default none)
+        prefix -- string (default none)
+        num_rows -- integer (default none)
+        global_i -- integer (default none)
+
+    """
+    start_row_key = 'traj_{:05d}_step_{:05d}'.format(traj_i, 0)
+    end_row_key = 'traj_{:05d}_step_{:05d}'.format(traj_i+1, 0)
+    if traj_i + 1 >= global_i: end_row_key = None
+    partial_rows = cbt_table.read_rows(start_row_key, end_row_key)
+    return partial_rows
