@@ -18,9 +18,9 @@ _sym_db = _symbol_database.Default()
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='protobuf/bytes_experience_replay.proto',
   package='experience_replay',
-  syntax='proto2',
+  syntax='proto3',
   serialized_options=None,
-  serialized_pb=_b('\n&protobuf/bytes_experience_replay.proto\x12\x11\x65xperience_replay\"6\n\x0cObservations\x12\x12\n\nvisual_obs\x18\x01 \x01(\x0c\x12\x12\n\nvector_obs\x18\x02 \x01(\x0c\"\x1a\n\x07\x41\x63tions\x12\x0f\n\x07\x61\x63tions\x18\x03 \x01(\x0c\"\x1a\n\x07Rewards\x12\x0f\n\x07rewards\x18\x04 \x01(\x0c\"h\n\x04Info\x12\x1b\n\x0fvisual_obs_spec\x18\x05 \x03(\x05\x42\x02\x10\x01\x12\x1b\n\x0fvector_obs_spec\x18\x06 \x03(\x05\x42\x02\x10\x01\x12\x13\n\x0b\x61\x63tion_spec\x18\x07 \x01(\x05\x12\x11\n\tnum_steps\x18\x08 \x01(\x05')
+  serialized_pb=_b('\n&protobuf/bytes_experience_replay.proto\x12\x11\x65xperience_replay\"6\n\x0cObservations\x12\x12\n\nvisual_obs\x18\x01 \x01(\x0c\x12\x12\n\nvector_obs\x18\x02 \x01(\x0c\"\x1a\n\x07\x41\x63tions\x12\x0f\n\x07\x61\x63tions\x18\x03 \x01(\x0c\"\x1a\n\x07Rewards\x12\x0f\n\x07rewards\x18\x04 \x01(\x0c\"h\n\x04Info\x12\x1b\n\x0fvisual_obs_spec\x18\x05 \x03(\x05\x42\x02\x10\x01\x12\x1b\n\x0fvector_obs_spec\x18\x06 \x03(\x05\x42\x02\x10\x01\x12\x13\n\x0b\x61\x63tion_spec\x18\x07 \x01(\x05\x12\x11\n\tnum_steps\x18\x08 \x01(\x05\x62\x06proto3')
 )
 
 
@@ -55,7 +55,7 @@ _OBSERVATIONS = _descriptor.Descriptor(
   ],
   serialized_options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
@@ -86,7 +86,7 @@ _ACTIONS = _descriptor.Descriptor(
   ],
   serialized_options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
@@ -117,7 +117,7 @@ _REWARDS = _descriptor.Descriptor(
   ],
   serialized_options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
@@ -169,7 +169,7 @@ _INFO = _descriptor.Descriptor(
   ],
   serialized_options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
