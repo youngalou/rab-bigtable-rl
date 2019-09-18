@@ -8,7 +8,7 @@ import tensorflow as tf
 
 from protobuf.bytes_experience_replay_pb2 import Observations, Actions, Rewards, Info
 from models.dqn_model import DQN_Model, ExperienceBuffer
-from util.gcp_io import gcs_load_weights, gcs_save_weights, cbt_global_iterator, cbt_read_rows
+from util.gcp_io import gcs_load_weights, gcs_save_weights, cbt_get_global_trajectory_buffer, cbt_read_trajectory
 from util.logging import TimeLogger
 from util.distributions import get_distribution_strategy
 
@@ -53,7 +53,6 @@ class DQN_Agent():
 
         self.buffer_size = kwargs['buffer_size']
         self.batch_size = kwargs['batch_size']
-        self.num_trajectories = kwargs['num_trajectories']
         self.train_epochs = kwargs['train_epochs']
         self.train_steps = kwargs['train_steps']
         self.period = kwargs['period']
@@ -96,46 +95,54 @@ class DQN_Agent():
 
         if self.log_time is True: self.time_logger.reset()
 
-        #FETCH DATA
-        global_i = cbt_global_iterator(self.cbt_table)
-        rows = cbt_read_rows(self.cbt_table, self.prefix, self.num_trajectories, global_i)
+        global_traj_buff = cbt_get_global_trajectory_buffer(self.cbt_table)
 
-        if self.log_time is True: self.time_logger.log("Fetch Data      ")
+        for traj_i in global_traj_buff:
+            rows = cbt_read_trajectory(self.cbt_table, traj_i)
         
-        for row in tqdm(rows, "Parsing trajectories {} - {}".format(global_i - self.num_trajectories, global_i - 1)):
-            #DESERIALIZE DATA
-            bytes_obs = row.cells['trajectory']['obs'.encode()][0].value
-            bytes_actions = row.cells['trajectory']['actions'.encode()][0].value
-            bytes_rewards = row.cells['trajectory']['rewards'.encode()][0].value
-            bytes_info = row.cells['trajectory']['info'.encode()][0].value
-            
-            pb2_obs, pb2_actions, pb2_rewards, info = Observations(), Actions(), Rewards(), Info()
-            pb2_obs.ParseFromString(bytes_obs)
-            pb2_actions.ParseFromString(bytes_actions)
-            pb2_rewards.ParseFromString(bytes_rewards)
-            info.ParseFromString(bytes_info)
+            observations, actions, rewards, total_rewards = [], [], [], []
+            for row in rows:
+                #DESERIALIZE DATA
+                bytes_obs = row.cells['trajectory']['obs'.encode()][0].value
+                bytes_action = row.cells['trajectory']['actions'.encode()][0].value
+                bytes_reward = row.cells['trajectory']['rewards'.encode()][0].value
+                bytes_info = row.cells['trajectory']['info'.encode()][0].value
+                
+                pb2_obs, pb2_actions, pb2_rewards, info = Observations(), Actions(), Rewards(), Info()
+                pb2_obs.ParseFromString(bytes_obs)
+                pb2_actions.ParseFromString(bytes_action)
+                pb2_rewards.ParseFromString(bytes_reward)
+                info.ParseFromString(bytes_info)
 
-            if self.log_time is True: self.time_logger.log("Parse Bytes     ")
+                if self.log_time is True: self.time_logger.log("Parse Bytes     ")
 
-            #FORMAT DATA
-            obs_shape = np.append(info.num_steps, info.visual_obs_spec).astype(np.int32)
-            obs = np.frombuffer(pb2_obs.visual_obs, dtype=np.float32).reshape(obs_shape)
-            actions = np.frombuffer(pb2_actions.actions, dtype=np.uint8).astype(np.int32)
-            rewards = np.frombuffer(pb2_rewards.rewards, dtype=np.float32)
+                #FORMAT DATA
+                obs_shape = np.append(1, info.visual_obs_spec).astype(np.int32)
+                observations.append(np.frombuffer(pb2_obs.visual_obs, dtype=np.float32).reshape(obs_shape))
+                actions.append(np.frombuffer(pb2_actions.actions, dtype=np.int32))
+                rewards.append(np.frombuffer(pb2_rewards.rewards, dtype=np.float32))
+
+            obs = np.concatenate(observations, axis=0)
+            actions = np.concatenate(actions, axis=0)
+            rewards = np.concatenate(rewards, axis=0)
+
+            num_steps = len(rewards)
             total_rewards.append(np.sum(rewards))
             discounted_future_rewards = []
-            for i in range(info.num_steps):
+            for i in range(num_steps):
                 end_i = i + self.update_horizon
-                if end_i <= info.num_steps:
+                if end_i <= num_steps:
                     horizon_rewards = rewards[i:end_i]
                 else:
-                    horizon_rewards = np.append(rewards[i:], np.zeros(end_i-info.num_steps))
+                    horizon_rewards = np.append(rewards[i:], np.zeros(end_i-num_steps))
                 discounted_future_rewards.append(np.sum(horizon_rewards * self.future_discounts))
             discounted_future_rewards = np.asarray(discounted_future_rewards).astype(np.float32)
 
             if self.log_time is True: self.time_logger.log("Format Data     ")
 
-            self.exp_buff.add_trajectory(obs, actions, discounted_future_rewards, info.num_steps)
+            self.exp_buff.add_trajectory(obs, actions, discounted_future_rewards, num_steps)
+
+            if self.exp_buff.size >= self.exp_buff.max_size: break
 
             if self.log_time is True: self.time_logger.log("Add To Exp_Buff ")
         self.exp_buff.preprocess()

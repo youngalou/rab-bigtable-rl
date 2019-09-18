@@ -1,23 +1,23 @@
-syntax = "proto2";
+syntax = "proto3";
 
 package experience_replay;
 
 message Observations {
-    optional bytes visual_obs = 1;
-    optional bytes vector_obs = 2;
+    bytes visual_obs = 1;
+    bytes vector_obs = 2;
 }
 
 message Actions {
-    optional bytes actions = 3;
+    bytes actions = 3;
 }
 
 message Rewards {
-    optional bytes rewards = 4;
+    bytes rewards = 4;
 }
 
 message Info {
     repeated int32 visual_obs_spec = 5 [packed=true];
     repeated int32 vector_obs_spec = 6 [packed=true];
-    optional int32 action_spec = 7;
-    optional int32 num_steps = 8;
+    int32 action_spec = 7;
+    int32 num_steps = 8;
 }

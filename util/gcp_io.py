@@ -134,6 +134,15 @@ def cbt_global_trajectory_buffer(cbt_table, local_traj_buff, global_traj_buff_si
                  timestamp=datetime.datetime.utcnow())
     cbt_table.mutate_rows([new_row])
 
+def cbt_get_global_trajectory_buffer(cbt_table):
+    row_filter = row_filters.CellsColumnLimitFilter(1)
+    row = cbt_table.read_row('global_traj_buff'.encode())
+    if row is not None:
+        return np.flip(np.frombuffer(row.cells['global']['traj_buff'.encode()][0].value, dtype=np.int32), axis=0)
+    else:
+        print("Table is empty.")
+        exit()
+
 def cbt_read_rows(cbt_table, prefix, num_rows, global_i):
     """ Reads N(num_rows) number of rows from cbt_table, starting from the global iterator value.
 
@@ -160,7 +169,7 @@ def cbt_read_row(cbt_table, prefix, row_i):
     row = cbt_table.read_row(row_key)
     return row
 
-def cbt_read_trajectory(cbt_table, traj_i, global_i):
+def cbt_read_trajectory(cbt_table, traj_i):
     """ Reads N(num_rows) number of rows from cbt_table, starting from the global iterator value.
 
         cbt_table -- bigtable object (default none)
@@ -171,6 +180,5 @@ def cbt_read_trajectory(cbt_table, traj_i, global_i):
     """
     start_row_key = 'traj_{:05d}_step_{:05d}'.format(traj_i, 0)
     end_row_key = 'traj_{:05d}_step_{:05d}'.format(traj_i+1, 0)
-    if traj_i + 1 >= global_i: end_row_key = None
     partial_rows = cbt_table.read_rows(start_row_key, end_row_key)
     return [row for row in partial_rows]

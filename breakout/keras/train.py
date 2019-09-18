@@ -28,7 +28,6 @@ if __name__ == '__main__':
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     parser.add_argument('--buffer-size', type=int, default=1000)
     parser.add_argument('--batch-size', type=int, default=256)
-    parser.add_argument('--num-trajectories', type=int, default=10)
     parser.add_argument('--train-epochs', type=int, default=1000000)
     parser.add_argument('--train-steps', type=int, default=100)
     parser.add_argument('--period', type=int, default=1)
@@ -70,7 +69,6 @@ if __name__ == '__main__':
                       tmp_weights_filepath=args.tmp_weights_filepath,
                       buffer_size=args.buffer_size,
                       batch_size=args.batch_size,
-                      num_trajectories=args.num_trajectories,
                       train_epochs=args.train_epochs,
                       train_steps=args.train_steps,
                       period=args.period,

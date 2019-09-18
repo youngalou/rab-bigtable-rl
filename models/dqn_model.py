@@ -104,12 +104,12 @@ class ExperienceBuffer():
         self.obs, self.actions, self.rewards, self.next_obs, self.next_mask = \
             [], [], [], [], []
         
-        self._obs, self._actions, self._rewards, self._next_obs, self._next_mask = \
-            [], [], [], [], []
-        
         self.max_size = max_size
         self.update_horizon = update_horizon
         self.size = 0
+    
+    def reset(self):
+        self.__init__(self.max_size, self.update_horizon)
 
     def add_trajectory(self, obs, actions, rewards, num_steps):
         shift = self.update_horizon * -1
@@ -117,8 +117,17 @@ class ExperienceBuffer():
         next_mask = np.append(np.ones(num_steps-self.update_horizon), np.zeros(self.update_horizon))
         next_mask = next_mask.astype(np.float32)
 
+        if self.size >= self.max_size:
+            self.reset()
+
+        new_size = self.size + num_steps
+        if new_size > self.max_size:
+            obs, actions, rewards, next_obs, next_mask = \
+                self.truncate(obs, actions, rewards, next_obs, next_mask)
+            new_size = self.max_size
+
         self.append(obs, actions, rewards, next_obs, next_mask)
-        self.size = self.size + num_steps
+        self.size = new_size
 
     def append(self, obs, actions, rewards, next_obs, next_mask):
         self.obs.append(obs)
@@ -134,5 +143,6 @@ class ExperienceBuffer():
         self.next_obs = np.concatenate(self.next_obs, axis=0)
         self.next_mask = np.concatenate(self.next_mask, axis=0)
 
-    def reset(self):
-        self.__init__(self.max_size, self.update_horizon)
+    def truncate(self, obs, actions, rewards, next_obs, next_mask):
+        split = self.max_size - self.size
+        return obs[:split], actions[:split], rewards[:split], next_obs[:split], next_mask[:split]
