@@ -11,7 +11,8 @@ from google.oauth2 import service_account
 
 from protobuf.bytes_experience_replay_pb2 import Observations, Actions, Rewards, Info
 from models.dqn_model import DQN_Model
-from util.gcp_io import gcp_load_pipeline, gcs_load_weights, cbt_global_iterator
+from util.gcp_io import gcp_load_pipeline, gcs_load_weights, \
+                        cbt_global_iterator, cbt_global_trajectory_buffer
 from util.logging import TimeLogger
 
 import gym
@@ -41,13 +42,14 @@ if __name__ == '__main__':
     parser.add_argument('--num-episodes', type=int, default=1)
     parser.add_argument('--max-steps', type=int, default=100)
     parser.add_argument('--update-interval', type=int, default=10)
+    parser.add_argument('--global-traj-buff-size', type=int, default=10)
     parser.add_argument('--log-time', default=False, action='store_true')
     args = parser.parse_args()
 
     #INSTANTIATE CBT TABLE AND GCS BUCKET
     credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
     cbt_table, gcs_bucket = gcp_load_pipeline(args.gcp_project_id, args.cbt_instance_id, args.cbt_table_name, args.bucket_id, credentials)
-    max_row_bytes = (4 * np.prod(VISUAL_OBS_SPEC) + 4 + 64)
+    max_row_bytes = (4*np.prod(VISUAL_OBS_SPEC) + 64)
     cbt_batcher = cbt_table.mutations_batcher(flush_count=args.num_episodes, max_row_bytes=max_row_bytes)
 
     #INITIALIZE ENVIRONMENT
@@ -62,13 +64,10 @@ if __name__ == '__main__':
                       fc_layer_params=FC_LAYER_PARAMS,
                       learning_rate=LEARNING_RATE)
 
-    #GLOBAL ITERATOR
-    global_i = cbt_global_iterator(cbt_table)
-    print("global_i = {}".format(global_i))
-
     #INITIALIZE EXECUTION TIME LOGGER
     if args.log_time is True:
         time_logger = TimeLogger(["Load Weights     ",
+                                  "Global Iterator  ",
                                   "Run Environment  ",
                                   "Data To Bytes    ",
                                   "Write Cells      ",
@@ -85,10 +84,14 @@ if __name__ == '__main__':
         if args.log_time is True: time_logger.log("Load Weights     ")
 
         rows = []
+        local_traj_buff = []
         print("Collecting cycle {}:".format(cycle))
         for episode in range(args.num_episodes):
             #UPDATE GLOBAL ITERATOR
             global_i = cbt_global_iterator(cbt_table)
+            local_traj_buff.append(global_i)
+
+            if args.log_time is True: time_logger.log("Global Iterator  ")
 
             #RL LOOP GENERATES A TRAJECTORY
             obs = np.asarray(env.reset() / 255).astype(np.float32)
@@ -105,7 +108,7 @@ if __name__ == '__main__':
                 if args.log_time is True: time_logger.log("Run Environment  ")
 
                 observation = np.expand_dims(obs, axis=0).flatten().tobytes()
-                action = np.asarray(action).astype(np.uint8).tobytes()
+                action = np.asarray(action).astype(np.int32).tobytes()
                 reward = np.asarray(reward).astype(np.float32).tobytes()
 
                 #BUILD PB2 OBJECTS
@@ -118,8 +121,7 @@ if __name__ == '__main__':
                 if args.log_time is True: time_logger.log("Data To Bytes    ")
 
                 #WRITE TO AND APPEND ROW
-                row_key_i = episode + global_i + (cycle * args.num_episodes)
-                row_key = 'traj_{:05d}_step_{:05d}'.format(row_key_i, step).encode()
+                row_key = 'traj_{:05d}_step_{:05d}'.format(global_i, step).encode()
                 row = cbt_table.row(row_key)
                 row.set_cell(column_family_id='trajectory',
                             column='obs'.encode(),
@@ -138,13 +140,13 @@ if __name__ == '__main__':
                 if args.log_time is True: time_logger.log("Write Cells      ")
         
         #ADD ROWS TO BIGTABLE
-        rows.append(gi_row)
+        cbt_global_trajectory_buffer(cbt_table, np.asarray(local_traj_buff).astype(np.int32), args.global_traj_buff_size)
         cbt_batcher.mutate_rows(rows)
         cbt_batcher.flush()
 
         if args.log_time is True: time_logger.log("Mutate Rows      ")
 
-        print("-> Saved trajectories {} - {}.".format(row_key_i - (args.num_episodes-1), row_key_i))
+        print("-> Saved trajectories {}.".format(local_traj_buff))
 
         if args.log_time is True: time_logger.print_totaltime_logs()
     env.close()
