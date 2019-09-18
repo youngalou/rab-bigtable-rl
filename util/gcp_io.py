@@ -35,7 +35,7 @@ def cbt_load_table(gcp_project_id, cbt_instance_id, cbt_table_name, credentials)
     if not cbt_table.exists():
         print("-> Table doesn't exist. Creating [{}] table...".format(cbt_table_name))
         max_versions_rule = bigtable.column_family.MaxVersionsGCRule(1)
-        column_families = {'trajectory': max_versions_rule, 'global': max_versions_rule}
+        column_families = {'step': max_versions_rule, 'global': max_versions_rule}
         cbt_table.create(column_families=column_families)
         print('-> Table created. Give it ~10 seconds to initialize before loading data.')
         exit()
