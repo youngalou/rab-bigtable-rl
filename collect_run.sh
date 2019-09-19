@@ -1,5 +1,5 @@
 #!/bin/bash
-export COLLECTION_PY=crane.collect
+export COLLECTION_PY=crane.collect_individual_steps
 export ENV_FILENAME=CraneML_0813.x86_64
 
 echo "==> Host name: " $HOSTNAME
