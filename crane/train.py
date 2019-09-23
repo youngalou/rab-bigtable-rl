@@ -21,9 +21,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
-    parser.add_argument('--cbt-table-name', type=str, default='crane-experience-replay')
+    parser.add_argument('--cbt-table-name', type=str, default='crane-simplereward-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='youngalou') #grpc://35.239.99.173:6470
-    parser.add_argument('--prefix', type=str, default='crane')
+    parser.add_argument('--prefix', type=str, default='crane-simplereward')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--buffer-size', type=int, default=1000)
     parser.add_argument('--batch-size', type=int, default=256)
