@@ -5,6 +5,8 @@ import numpy as np
 from mlagents.envs import UnityEnvironment
 from gym import error, spaces
 
+from util.rendering import SimpleImageViewer
+
 class UnityGymException(error.Error):
     """
     Any error related to the gym wrapper of ml-agents.
@@ -270,8 +272,15 @@ class UnityEnvironmentWrapper(gym.Env):
         else:
             return multiple_visual_obs
 
-    def render(self, mode="rgb_array"):
-        return self.visual_obs
+    def render(self, mode='rgb_array'):
+        img = self.visual_obs
+        if mode == 'rgb_array':
+            return img
+        elif mode == 'human':
+            if self.viewer is None:
+                self.viewer = SimpleImageViewer()
+            self.viewer.imshow(img)
+            return self.viewer.isopen
 
     def close(self):
         """Override _close in your subclass to perform any necessary cleanup.

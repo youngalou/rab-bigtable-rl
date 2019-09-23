@@ -34,7 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     parser.add_argument('--log-time', default=False, action='store_true')
     parser.add_argument('--num-gpus', type=int, default=0)
-    parser.add_argument('--tpu-name', type=str, default='youngalou')
+    parser.add_argument('--tpu-name', type=str, default='grpc://10.240.1.2:8470')
     parser.add_argument('--wandb', type=str, default=None)
     args = parser.parse_args()
 
