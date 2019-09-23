@@ -150,7 +150,6 @@ def cbt_read_rows(cbt_table, prefix, num_rows, global_i):
         prefix -- string (default none)
         num_rows -- integer (default none)
         global_i -- integer (default none)
-
     """
     start_i, end_i = global_i - num_rows, global_i - 1
     start_row_key = prefix + '_trajectory_' + '{:05d}'.format(start_i)
@@ -176,9 +175,8 @@ def cbt_read_trajectory(cbt_table, traj_i):
         prefix -- string (default none)
         num_rows -- integer (default none)
         global_i -- integer (default none)
-
     """
-    start_row_key = 'traj_{:05d}_step_{:05d}'.format(traj_i, 0)
-    end_row_key = 'traj_{:05d}_step_{:05d}'.format(traj_i+1, 0)
+    start_row_key = 'traj_{:05d}_step_{:05d}'.format(traj_i, 0).encode()
+    end_row_key = 'traj_{:05d}_step_{:05d}'.format(traj_i+1, 0).encode()
     partial_rows = cbt_table.read_rows(start_row_key, end_row_key)
-    return [row for row in partial_rows]
+    return partial_rows

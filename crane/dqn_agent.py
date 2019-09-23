@@ -1,14 +1,14 @@
 import os
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '0' 
 import argparse
 import datetime
 from tqdm import tqdm
 import numpy as np
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1' 
 import tensorflow as tf
 
 from protobuf.bytes_experience_replay_pb2 import Observations, Actions, Rewards, Info
 from models.dqn_model import DQN_Model, ExperienceBuffer
-from util.gcp_io import gcs_load_weights, gcs_save_weights, cbt_global_iterator, cbt_read_rows
+from util.gcp_io import gcs_load_weights, gcs_save_weights, cbt_get_global_trajectory_buffer, cbt_read_trajectory
 from util.logging import TimeLogger
 from util.distributions import get_distribution_strategy
 
@@ -40,22 +40,29 @@ class DQN_Agent():
         self.input_shape = hyperparams['input_shape']
         self.num_actions = hyperparams['num_actions']
         self.gamma = hyperparams['gamma']
+        self.update_horizon = hyperparams['update_horizon']
+        self.future_discounts = np.power(self.gamma, range(self.update_horizon))
+        self.bootstrap_discount = np.power(self.gamma, self.update_horizon)
+        
         self.cbt_table = kwargs['cbt_table']
         self.gcs_bucket = kwargs['gcs_bucket']
         self.gcs_bucket_id = kwargs['gcs_bucket_id']
         self.prefix = kwargs['prefix']
         self.tmp_weights_filepath = kwargs['tmp_weights_filepath']
+        self.output_dir = kwargs['output_dir']
+
+        self.buffer_size = kwargs['buffer_size']
         self.batch_size = kwargs['batch_size']
-        self.num_trajectories = kwargs['num_trajectories']
         self.train_epochs = kwargs['train_epochs']
         self.train_steps = kwargs['train_steps']
         self.period = kwargs['period']
-        self.output_dir = kwargs['output_dir']
+        
         self.log_time = kwargs['log_time']
         self.num_gpus = kwargs['num_gpus']
         self.tpu_name = kwargs['tpu_name']
         self.wandb = kwargs['wandb']
-        self.exp_buff = ExperienceBuffer(kwargs['buffer_size'])
+
+        self.exp_buff = ExperienceBuffer(self.buffer_size, self.update_horizon)
 
         if self.tpu_name is not None:
             self.distribution_strategy = get_distribution_strategy(distribution_strategy='tpu', tpu_address=self.tpu_name)
@@ -69,6 +76,11 @@ class DQN_Agent():
                                    conv_layer_params=hyperparams['conv_layer_params'],
                                    fc_layer_params=hyperparams['fc_layer_params'],
                                    learning_rate=hyperparams['learning_rate'])
+            self.target_model = DQN_Model(input_shape=self.input_shape,
+                                          num_actions=self.num_actions,
+                                          conv_layer_params=hyperparams['conv_layer_params'],
+                                          fc_layer_params=hyperparams['fc_layer_params'],
+                                          learning_rate=hyperparams['learning_rate'])
         gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
     def fill_experience_buffer(self):
@@ -79,41 +91,63 @@ class DQN_Agent():
 
         """
         self.exp_buff.reset()
+        total_rewards = []
 
         if self.log_time is True: self.time_logger.reset()
 
-        #FETCH DATA
-        global_i = cbt_global_iterator(self.cbt_table)
-        rows = cbt_read_rows(self.cbt_table, self.prefix, self.num_trajectories, global_i)
+        global_traj_buff = cbt_get_global_trajectory_buffer(self.cbt_table)
+        print(global_traj_buff)
 
-        if self.log_time is True: self.time_logger.log("Fetch Data      ")
+        for traj_i in global_traj_buff:
+            rows = cbt_read_trajectory(self.cbt_table, traj_i)
+
+            if self.log_time is True: self.time_logger.log("Fetch Data      ")
         
-        for row in tqdm(rows, "Parsing trajectories {} - {}".format(global_i - self.num_trajectories, global_i - 1)):
-            #DESERIALIZE DATA
-            bytes_obs = row.cells['trajectory']['obs'.encode()][0].value
-            bytes_actions = row.cells['trajectory']['actions'.encode()][0].value
-            bytes_rewards = row.cells['trajectory']['rewards'.encode()][0].value
-            bytes_info = row.cells['trajectory']['info'.encode()][0].value
-            
-            pb2_obs, pb2_actions, pb2_rewards, info = Observations(), Actions(), Rewards(), Info()
-            pb2_obs.ParseFromString(bytes_obs)
-            pb2_actions.ParseFromString(bytes_actions)
-            pb2_rewards.ParseFromString(bytes_rewards)
-            info.ParseFromString(bytes_info)
+            observations, actions, rewards, total_rewards = [], [], [], []
+            for row in rows:
+                #DESERIALIZE DATA
+                bytes_obs = row.cells['step']['obs'.encode()][0].value
+                bytes_action = row.cells['step']['action'.encode()][0].value
+                bytes_reward = row.cells['step']['reward'.encode()][0].value
+                bytes_info = row.cells['step']['info'.encode()][0].value
+                
+                pb2_obs, pb2_actions, pb2_rewards, info = Observations(), Actions(), Rewards(), Info()
+                pb2_obs.ParseFromString(bytes_obs)
+                pb2_actions.ParseFromString(bytes_action)
+                pb2_rewards.ParseFromString(bytes_reward)
+                info.ParseFromString(bytes_info)
 
-            if self.log_time is True: self.time_logger.log("Parse Bytes     ")
+                #FORMAT DATA
+                obs_shape = np.append(1, info.visual_obs_spec).astype(np.int32)
+                observations.append(np.frombuffer(pb2_obs.visual_obs, dtype=np.float32).reshape(obs_shape))
+                actions.append(np.frombuffer(pb2_actions.actions, dtype=np.int32))
+                rewards.append(np.frombuffer(pb2_rewards.rewards, dtype=np.float32))
 
-            #FORMAT DATA
-            obs_shape = np.append(info.num_steps, info.visual_obs_spec).astype(np.int32)
-            obs = np.frombuffer(pb2_obs.visual_obs, dtype=np.float32).reshape(obs_shape)
-            actions = np.frombuffer(pb2_actions.actions, dtype=np.uint8).astype(np.int32)
-            rewards = np.frombuffer(pb2_rewards.rewards, dtype=np.float32)
+                if self.log_time is True: self.time_logger.log("Parse Bytes     ")
+
+            obs = np.concatenate(observations, axis=0)
+            actions = np.concatenate(actions, axis=0)
+            rewards = np.concatenate(rewards, axis=0)
+
+            num_steps = len(rewards)
+            total_rewards.append(np.sum(rewards))
+            discounted_future_rewards = []
+            for i in range(num_steps):
+                end_i = i + self.update_horizon
+                if end_i <= num_steps:
+                    horizon_rewards = rewards[i:end_i]
+                else:
+                    horizon_rewards = np.append(rewards[i:], np.zeros(end_i-num_steps))
+                discounted_future_rewards.append(np.sum(horizon_rewards * self.future_discounts))
+            discounted_future_rewards = np.asarray(discounted_future_rewards).astype(np.float32)
 
             if self.log_time is True: self.time_logger.log("Format Data     ")
 
-            self.exp_buff.add_trajectory(obs, actions, rewards, info.num_steps)
+            self.exp_buff.add_trajectory(obs, actions, discounted_future_rewards, num_steps)
 
-            if self.log_time is True: self.time_logger.log("Add To Exp_Buff ")
+            print(self.exp_buff.size)
+
+            if self.exp_buff.size >= self.exp_buff.max_size: break
         self.exp_buff.preprocess()
 
         dataset = tf.data.Dataset.from_tensor_slices(
@@ -125,7 +159,7 @@ class DQN_Agent():
 
         if self.log_time is True: self.time_logger.log("To Dataset      ")
 
-        return dist_dataset
+        return dist_dataset, np.mean(total_rewards)
 
     def train(self):
         """
@@ -138,36 +172,39 @@ class DQN_Agent():
                 ((b_obs, b_next_obs), (b_actions, b_rewards, b_next_mask)) = inputs
 
                 with tf.GradientTape() as tape:
-                    q_pred, q_next = self.model(b_obs), self.model(b_next_obs)
+                    q_pred, q_next = self.model(b_obs), self.target_model(b_next_obs)
                     one_hot_actions = tf.one_hot(b_actions, self.num_actions)
                     q_pred = tf.reduce_sum(q_pred * one_hot_actions, axis=-1)
-                    q_next = tf.reduce_max(q_next, axis=-1)
-                    q_target = b_rewards + (tf.constant(self.gamma, dtype=tf.float32) * q_next)
+                    q_next = tf.reduce_max(q_next, axis=-1) * b_next_mask
+                    q_target = b_rewards + (tf.constant(self.bootstrap_discount, dtype=tf.float32) * q_next)
                     mse = self.model.loss(q_target, q_pred)
                     loss = tf.reduce_sum(mse)
-                
+
                 total_grads = tape.gradient(loss, self.model.trainable_weights)
                 self.model.opt.apply_gradients(list(zip(total_grads, self.model.trainable_weights)))
                 return mse
 
-            per_example_losses = self.distribution_strategy.experimental_run_v2(step_fn, args=(dist_inputs,))
-            mean_loss = self.distribution_strategy.reduce(tf.distribute.ReduceOp.MEAN, per_example_losses, axis=None)
+            dist_losses = self.distribution_strategy.experimental_run_v2(step_fn, args=(dist_inputs,))
+            mean_loss = self.distribution_strategy.reduce(tf.distribute.ReduceOp.MEAN, dist_losses, axis=None)
             return mean_loss
 
         if self.log_time is True:
             self.time_logger = TimeLogger(["Fetch Data      ",
                                            "Parse Bytes     ",
                                            "Format Data     ",
-                                           "Add To Exp_Buff ",
                                            "To Dataset      ",
                                            "Train Step      ",
                                            "Save Model      "])
         print("-> Starting training...")
-        for epoch in range(self.train_epochs):
-            with tf.device(self.device), self.distribution_strategy.scope():
-                dataset = self.fill_experience_buffer()
+        with tf.device(self.device), self.distribution_strategy.scope():
+            for epoch in range(self.train_epochs):
+                dataset, mean_reward = self.fill_experience_buffer()
                 exp_buff = iter(dataset)
 
+                if self.log_time is True: self.time_logger.set_start()
+
+                #UPDATE TARGET MODEL
+                self.target_model.set_weights(self.model.get_weights())
                 losses = []
                 for step in tqdm(range(self.train_steps), "Training epoch {}".format(epoch)):
                     loss = train_step(next(exp_buff))
@@ -177,15 +214,15 @@ class DQN_Agent():
                 
                 if self.wandb is not None:
                     mean_loss = np.mean(losses)
-                    tf.summary.scalar("Mean Loss", mean_loss, epoch)
                     self.wandb.log({"Epoch": epoch,
-                                    "Mean Loss": mean_loss})
+                                    "Mean Loss": mean_loss,
+                                    "Mean Reward": mean_reward})
 
-            if epoch > 0 and epoch % self.period == 0:
-                model_filename = self.prefix + '_model.h5'
-                gcs_save_weights(self.model, self.gcs_bucket, self.tmp_weights_filepath, model_filename)
+                if self.period > 0 and epoch % self.period == 0:
+                    model_filename = self.prefix + '_model.h5'
+                    gcs_save_weights(self.model, self.gcs_bucket, self.tmp_weights_filepath, model_filename)
 
-            if self.log_time is True: self.time_logger.log("Save Model      ")
+                if self.log_time is True: self.time_logger.log("Save Model      ")
 
-            if self.log_time is True: self.time_logger.print_totaltime_logs()
+                if self.log_time is True: self.time_logger.print_totaltime_logs()
         print("-> Done!")
