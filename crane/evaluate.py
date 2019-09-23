@@ -7,7 +7,7 @@ import numpy as np
 from google.oauth2 import service_account
 
 from models.dqn_model import DQN_Model
-from util.gcp_io import gcs_load_bucket, gcs_load_weights, cbt_global_iterator
+from util.gcp_io import gcs_load_bucket, gcs_load_weights
 
 import gym
 
@@ -16,17 +16,18 @@ SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 #MODEL HYPERPARAMETERS
-VECTOR_OBS_SPEC = [4]
-NUM_ACTIONS=2
-FC_LAYER_PARAMS=(200,)
-LEARNING_RATE=0.00042
+VISUAL_OBS_SPEC = [224,224,3]
+VECTOR_OBS_SPEC = [10]
+NUM_ACTIONS=6
+CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
+FC_LAYER_PARAMS=(512,)
 
 if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
-    parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
+    parser = argparse.ArgumentParser('Crane Evaluation Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
-    parser.add_argument('--bucket-id', type=str, default='rab-rl-bucket')
-    parser.add_argument('--prefix', type=str, default='cartpole')
+    parser.add_argument('--bucket-id', type=str, default='youngalou')
+    parser.add_argument('--prefix', type=str, default='crane')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000)
     parser.add_argument('--num-episodes', type=int, default=10)
@@ -44,8 +45,10 @@ if __name__ == '__main__':
                       learning_rate=LEARNING_RATE)
 
     #INITIALIZE ENVIRONMENT
-    print("-> Initializing Gym environement...")
-    env = gym.make('CartPole-v0')
+    print("-> Initializing Crane environement...")
+    env = UnityEnvironmentWrapper(environment_filename=args.env_filename,
+                                  use_visual=True,
+                                  docker_training=False)
     print("-> Environment intialized.")
 
     #COLLECT DATA FOR CBT
@@ -60,7 +63,7 @@ if __name__ == '__main__':
             done = False
             
             for _ in range(args.max_steps):
-                env.render()
+                env.render(mode='human')
                 time.sleep(.05)
 
                 action = model.step(obs)

@@ -2,7 +2,7 @@ import argparse
 from google.oauth2 import service_account
 
 from util.gcp_io import gcp_load_pipeline
-from breakout.keras.dqn_agent import DQN_Agent
+from crane.dqn_agent import DQN_Agent
 
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
@@ -11,8 +11,9 @@ hyperparams = dict([
     ('input_shape', [224,224,3]),
     ('num_actions', 6),
     ('conv_layer_params', ((8,4,32),(4,2,64),(3,1,64))),
-    ('fc_layer_params', (512,200)),
+    ('fc_layer_params', (512,)),
     ('gamma', 0.9),
+    ('update_horizon', 5),
     ('learning_rate', 0.00042)
 ])
 
@@ -20,9 +21,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
-    parser.add_argument('--cbt-table-name', type=str, default='bytes-breakout-experience-replay')
-    parser.add_argument('--bucket-id', type=str, default='youngalou')
-    parser.add_argument('--prefix', type=str, default='breakout')
+    parser.add_argument('--cbt-table-name', type=str, default='crane-experience-replay')
+    parser.add_argument('--bucket-id', type=str, default='youngalou') #grpc://35.239.99.173:6470
+    parser.add_argument('--prefix', type=str, default='crane')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--buffer-size', type=int, default=1000)
     parser.add_argument('--batch-size', type=int, default=256)
@@ -33,7 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('--output-dir', type=str, default='/tmp/training/')
     parser.add_argument('--log-time', default=False, action='store_true')
     parser.add_argument('--num-gpus', type=int, default=0)
-    parser.add_argument('--tpu-name', type=str, default='youngalou')
+    parser.add_argument('--tpu-name', type=str, default='grpc://10.240.1.2:8470')
     parser.add_argument('--wandb', type=str, default=None)
     args = parser.parse_args()
 

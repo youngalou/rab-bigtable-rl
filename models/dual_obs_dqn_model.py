@@ -53,51 +53,60 @@ class AdvantageHead(tf.keras.Model):
 
 class DQN_Model(tf.keras.Model):
     def __init__(self,
-                 input_shape=None,
+                 visual_obs_shape=None,
+                 vector_obs_shape=None,
                  num_actions=None,
                  conv_layer_params=None,
                  fc_layer_params=None,
                  learning_rate=0.00042):
         super().__init__()
-        if conv_layer_params is not None:
+        if visual_obs_shape and conv_layer_params:
             self.convs = CustomConvs(conv_layer_params)
-        else: self.convs = None
+        else:
+            self.convs = None
         if fc_layer_params is not None:
             self.value_head = ValueHead(fc_layer_params)
             self.advantage_head = AdvantageHead(fc_layer_params, num_actions)
 
-        self.step(np.zeros(input_shape, dtype=np.float32))
+        init_visual_obs = np.zeros(visual_obs_shape, dtype=np.float32) if visual_obs_shape else None
+        init_vector_obs = np.zeros(vector_obs_shape, dtype=np.float32) if vector_obs_shape else None
+        self.step(init_visual_obs, init_vector_obs)
         self.loss = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.SUM)
         self.opt = tf.optimizers.Adam(learning_rate)
 
         self.num_actions = num_actions
         self.public_url = None
 
-    def call(self, inputs):
+    def call(self, visual_obs=None, vector_obs=None):
         if self.convs is not None:
-            inputs = self.convs(inputs)
-        value = self.value_head(inputs)
-        advantage = self.advantage_head(inputs)
+            embedding = self.convs(visual_obs)
+            fc_inputs = tf.concatenate([embedding, vector_obs])
+        else:
+            fc_inputs = vector_obs
+        value = self.value_head(fc_inputs)
+        advantage = self.advantage_head(fc_inputs)
         output = value + (advantage - tf.reduce_mean(advantage))
         return tf.cast(output, dtype=tf.float32)
     
-    def step(self, inputs):
-        inputs = np.expand_dims(inputs, 0)
-        q_values = tf.squeeze(self(inputs))
+    def step(self, visual_obs=None, vector_obs=None):
+        visual_obs = np.expand_dims(visual_obs, 0) if visual_obs else None
+        vector_obs = np.expand_dims(vector_obs, 0) if vector_obs else None
+        q_values = tf.squeeze(self(visual_obs, vector_obs))
         action = tf.argmax(q_values).numpy()
         return action
 
-    def step_stochastic(self, inputs):
-        inputs = np.expand_dims(inputs, 0)
-        logits = self(inputs)
+    def step_stochastic(self, visual_obs=None, vector_obs=None):
+        visual_obs = np.expand_dims(visual_obs, 0) if visual_obs else None
+        vector_obs = np.expand_dims(vector_obs, 0) if vector_obs else None
+        logits = self(visual_obs, vector_obs)
         action = tf.squeeze(tf.random.categorical(logits, 1)).numpy()
         return action
 
-    def step_epsilon_greedy(self, inputs, epsilon):
+    def step_epsilon_greedy(self, visual_obs=None, vector_obs=None, epsilon):
         sample = np.random.random()
         if sample > 1 - epsilon:
             return np.random.randint(self.num_actions)
-        return self.step(inputs)
+        return self.step(visual_obs, vector_obs)
 
 class ExperienceBuffer():
     def __init__(self, max_size, update_horizon):
@@ -116,6 +125,9 @@ class ExperienceBuffer():
         next_obs = np.roll(obs, shift=shift, axis=0)
         next_mask = np.append(np.ones(num_steps-self.update_horizon), np.zeros(self.update_horizon))
         next_mask = next_mask.astype(np.float32)
+
+        if self.size >= self.max_size:
+            self.reset()
 
         new_size = self.size + num_steps
         if new_size > self.max_size:

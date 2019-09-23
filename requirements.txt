@@ -2,6 +2,7 @@ mlagents-envs==0.9.1
 tensorflow==2.0.0-beta1
 tensorboard==1.14.0
 numpy==1.14.5
+gast==0.2.2
 protobuf
 gym[atari]
 tqdm
