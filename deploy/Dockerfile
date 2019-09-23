@@ -1,4 +1,5 @@
-# Example docker build -t gcr.io/for-robolab-cbai/rab16:init .  --build-arg git_pull=true env_filename=CraneML
+# docker build -t gcr.io/for-robolab-cbai/env:init --build-arg git_pull=true --build-arg env_filename=CraneML --no-cache .
+# Docker run -it gcr.io/for-robolab-cbai/env:init
 FROM gcr.io/for-robolab-cbai/env:1.0
 #Use git_pull=True during build to pull from from latest git
 ARG git_pull
