@@ -16,7 +16,6 @@ from util.gcp_io import gcp_load_pipeline, gcs_load_weights, \
 from util.logging import TimeLogger
 from util.unity_env import UnityEnvironmentWrapper
 
-
 #SET API CREDENTIALS
 SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
@@ -37,6 +36,7 @@ if __name__ == '__main__':
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
     parser.add_argument('--cbt-table-name', type=str, default='crane-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='youngalou')
+    parser.add_argument('--env-filename', type=str, default='envs/CraneML.x86_64')
     parser.add_argument('--prefix', type=str, default='crane')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000000)
@@ -45,6 +45,7 @@ if __name__ == '__main__':
     parser.add_argument('--update-interval', type=int, default=1)
     parser.add_argument('--global-traj-buff-size', type=int, default=10)
     parser.add_argument('--log-time', default=False, action='store_true')
+    parser.add_argument('--docker-training', type=bool, default=False)
     args = parser.parse_args()
 
     #INSTANTIATE CBT TABLE AND GCS BUCKET
