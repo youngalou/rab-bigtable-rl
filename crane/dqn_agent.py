@@ -96,7 +96,7 @@ class DQN_Agent():
         if self.log_time is True: self.time_logger.reset()
 
         global_traj_buff = cbt_get_global_trajectory_buffer(self.cbt_table)
-        print(global_traj_buff)
+        print("global_traj_buff: {}".format(global_traj_buff))
 
         for traj_i in global_traj_buff:
             rows = cbt_read_trajectory(self.cbt_table, traj_i)

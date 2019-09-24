@@ -21,13 +21,15 @@ SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 #SET HYPERPARAMETERS
-VECTOR_OBS_SPEC = [8]
+VECTOR_OBS_SPEC = [29]
 VISUAL_OBS_SPEC = [224,224,3]
-NUM_ACTIONS=6
+NUM_ACTIONS=8
 CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
 FC_LAYER_PARAMS=(512,)
 LEARNING_RATE=0.00042
-EPSILON = 0.5
+EPS_START = 0.9
+EPS_FINAL = 0.2
+EPS_STEPS = 10000
 
 if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
@@ -95,6 +97,11 @@ if __name__ == '__main__':
             global_i = cbt_global_iterator(cbt_table)
             local_traj_buff.append(global_i)
 
+            if global_i < EPS_STEPS:
+                epsilon = EPS_START - (((EPS_START - EPS_FINAL) / EPS_STEPS) * global_i)
+            else:
+                epsilon = EPS_FINAL
+
             if args.log_time is True: time_logger.log("Global Iterator  ")
 
             #RL LOOP GENERATES A TRAJECTORY
@@ -103,7 +110,7 @@ if __name__ == '__main__':
             done = False
             
             for step in tqdm(range(args.max_steps), "Episode {}".format(episode)):
-                action = model.step_epsilon_greedy(obs, EPSILON)
+                action = model.step_epsilon_greedy(obs, epsilon)
                 new_obs, reward, done, info = env.step(action)
 
                 if done: break

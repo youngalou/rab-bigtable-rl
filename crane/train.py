@@ -9,7 +9,7 @@ SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 hyperparams = dict([
     ('input_shape', [224,224,3]),
-    ('num_actions', 6),
+    ('num_actions', 8),
     ('conv_layer_params', ((8,4,32),(4,2,64),(3,1,64))),
     ('fc_layer_params', (512,)),
     ('gamma', 0.9),
