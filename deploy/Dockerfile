@@ -1,4 +1,5 @@
-# Example docker build -t gcr.io/for-robolab-cbai/rab16:init .  --build-arg git_pull=true env_filename=CraneML
+# docker build -t gcr.io/for-robolab-cbai/env:init --build-arg git_pull=true --build-arg env_filename=RabRobotArm_09-23-19 --no-cache .
+# docker run -it gcr.io/for-robolab-cbai/env:init
 FROM gcr.io/for-robolab-cbai/env:1.0
 #Use git_pull=True during build to pull from from latest git
 ARG git_pull
@@ -9,9 +10,10 @@ ENV env_module=crane.collect
 ENV env_env_filename=${env_filename}
 WORKDIR /root/rab-bigtable-rl
 RUN if [ "$git_pull" ] ; then git pull; else echo not pulling; fi
-#Example gs bucket link https://storage.googleapis.com/rab_builds/CraneML_Linux.zip
+#Example gs bucket link https://storage.googleapis.com/rab_builds/RabRobotArm_09-23-19.zip
 RUN if [ "$env_filename" ] ; then \
-    curl https://storage.googleapis.com/rab_builds/${env_filename}.zip -o deploy/${env_filename}.zip &&\
+    rm -r deploy/* && \
+    curl https://storage.googleapis.com/rab_builds/${env_filename}.zip -o deploy/${env_filename}.zip && \
     unzip deploy/${env_filename}.zip -d deploy/ \
     ; else echo leaving default env \
     ; fi
