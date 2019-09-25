@@ -60,6 +60,7 @@ if __name__ == '__main__':
     print("-> Initializing Crane environement...")
     env = UnityEnvironmentWrapper(environment_filename=args.env_filename,
                                   use_visual=True,
+                                  allow_multiple_visual_obs=True,
                                   docker_training=args.docker_training)
     print("-> Environment intialized.")
 
