@@ -110,8 +110,8 @@ class DQN_Model(tf.keras.Model):
 
 class ExperienceBuffer():
     def __init__(self, max_size, update_horizon):
-        self.obs, self.actions, self.rewards, self.next_obs, self.next_mask = \
-            [], [], [], [], []
+        self.vis_obs,  self.vec_obs, self.actions, self.rewards, self.next_vis_obs, self.next_vec_obs, self.next_mask = \
+            [], [], [], [], [], [], []
         
         self.max_size = max_size
         self.update_horizon = update_horizon
@@ -120,9 +120,10 @@ class ExperienceBuffer():
     def reset(self):
         self.__init__(self.max_size, self.update_horizon)
 
-    def add_trajectory(self, obs, actions, rewards, num_steps):
+    def add_trajectory(self, vis_obs, vec_obs, actions, rewards, num_steps):
         shift = self.update_horizon * -1
-        next_obs = np.roll(obs, shift=shift, axis=0)
+        next_vis_obs = np.roll(vis_obs, shift=shift, axis=0)
+        next_vec_obs = np.roll(vec_obs, shift=shift, axis=0)
         next_mask = np.append(np.ones(num_steps-self.update_horizon), np.zeros(self.update_horizon))
         next_mask = next_mask.astype(np.float32)
 
@@ -131,27 +132,31 @@ class ExperienceBuffer():
 
         new_size = self.size + num_steps
         if new_size > self.max_size:
-            obs, actions, rewards, next_obs, next_mask = \
-                self.truncate(obs, actions, rewards, next_obs, next_mask)
+            vis_obs, vec_obs, actions, rewards, next_vis_obs, next_vec_obs, next_mask = \
+                self.truncate(vis_obs, vec_obs, actions, rewards, next_vis_obs, next_vec_obs, next_mask)
             new_size = self.max_size
 
-        self.append(obs, actions, rewards, next_obs, next_mask)
+        self.append(vis_obs, vec_obs, actions, rewards, next_vis_obs, next_vec_obs, next_mask)
         self.size = new_size
 
-    def append(self, obs, actions, rewards, next_obs, next_mask):
-        self.obs.append(obs)
+    def append(self, vis_obs, vec_obs, actions, rewards, next_vis_obs, next_vec_obs, next_mask):
+        self.vis_obs.append(vis_obs)
+        self.vec_obs.append(vec_obs)
         self.actions.append(actions)
         self.rewards.append(rewards)
-        self.next_obs.append(next_obs)
+        self.next_vis_obs.append(next_vis_obs)
+        self.next_vec_obs.append(next_vec_obs)
         self.next_mask.append(next_mask)
     
     def preprocess(self):
-        self.obs = np.concatenate(self.obs, axis=0)
+        self.vis_obs = np.concatenate(self.vis_obs, axis=0)
+        self.vec_obs = np.concatenate(self.vec_obs, axis=0)
         self.actions = np.concatenate(self.actions, axis=0)
         self.rewards = np.concatenate(self.rewards, axis=0)
-        self.next_obs = np.concatenate(self.next_obs, axis=0)
+        self.next_vis_obs = np.concatenate(self.next_vis_obs, axis=0)
+        self.next_vec_obs = np.concatenate(self.next_vec_obs, axis=0)
         self.next_mask = np.concatenate(self.next_mask, axis=0)
 
-    def truncate(self, obs, actions, rewards, next_obs, next_mask):
+    def truncate(self, vis_obs, actions, rewards, next_vis_obs, next_mask):
         split = self.max_size - self.size
-        return obs[:split], actions[:split], rewards[:split], next_obs[:split], next_mask[:split]
+        return vis_obs[:split], vec_obs[:split], actions[:split], rewards[:split], next_vis_obs[:split], next_vec_obs[:split] next_mask[:split]

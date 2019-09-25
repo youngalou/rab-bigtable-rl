@@ -22,7 +22,7 @@ SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 #SET HYPERPARAMETERS
 VECTOR_OBS_SPEC = [29]
-VISUAL_OBS_SPEC = [224,224,3]
+VISUAL_OBS_SPEC = [224,224,2]
 NUM_ACTIONS=8
 CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
 FC_LAYER_PARAMS=(512,)
@@ -65,8 +65,8 @@ if __name__ == '__main__':
     print("-> Environment intialized.")
 
     #LOAD MODEL
-    model = DQN_Model(input_shape=env._observation_space.shape,
-                      num_actions=env._action_space.n,
+    model = DQN_Model(input_shape=VISUAL_OBS_SPEC,
+                      num_actions=NUM_ACTIONS,
                       conv_layer_params=CONV_LAYER_PARAMS,
                       fc_layer_params=FC_LAYER_PARAMS,
                       learning_rate=LEARNING_RATE)
