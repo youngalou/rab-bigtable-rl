@@ -229,7 +229,7 @@ class UnityEnvironmentWrapper(gym.Env):
                 visual_obs_list = []
                 for obs in visual_obs:
                     visual_obs_list.append(self._preprocess_single(obs[0]))
-                self.visual_obs = visual_obs_list
+                self.visual_obs = np.moveaxis(np.concatenate(visual_obs_list, axis=0), 0, -1)
             else:
                 self.visual_obs = self._preprocess_single(visual_obs[0][0])
 
