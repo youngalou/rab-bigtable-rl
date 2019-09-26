@@ -28,7 +28,7 @@ class UnityEnvironmentWrapper(gym.Env):
         environment_filename: str,
         worker_id: int = 0,
         use_visual: bool = False,
-        use_vector: bool = False
+        use_vector: bool = False,
         flatten_branched: bool = False,
         no_graphics: bool = False,
         allow_multiple_visual_obs: bool = False,
