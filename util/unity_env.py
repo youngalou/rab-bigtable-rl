@@ -45,8 +45,8 @@ class UnityEnvironmentWrapper(gym.Env):
         :param allow_multiple_visual_obs: If True, return a list of visual observations instead of only one.
         """
         self._env = UnityEnvironment(
-            environment_filename, 
-            worker_id, 
+            environment_filename,
+            worker_id,
             no_graphics=no_graphics, 
             docker_training=docker_training
         )
@@ -76,8 +76,13 @@ class UnityEnvironmentWrapper(gym.Env):
                 " visual observations as part of this environment."
             )
         self.use_visual = brain.number_visual_observations >= 1 and use_visual
-        self.use_vector = use_vector
-
+        
+        if use_vector and brain.num_stacked_vector_observations == 0:
+            raise UnityGymException(
+                "`use_vector` was set to True, however there are no"
+                " vector observations as part of this environment."
+            )
+        self.use_vector = brain.num_stacked_vector_observations >= 1 and use_vector
         if brain.number_visual_observations > 1 and not self._allow_multiple_visual_obs:
             logger.warning(
                 "The environment contains more than one visual observation. "
