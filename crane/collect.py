@@ -10,7 +10,7 @@ import tensorflow as tf
 from google.oauth2 import service_account
 
 from protobuf.bytes_experience_replay_pb2 import Observations, Actions, Rewards, Info
-from models.dqn_model import DQN_Model
+from models.dual_obs_dqn_model import DQN_Model
 from util.gcp_io import gcp_load_pipeline, gcs_load_weights, \
                         cbt_global_iterator, cbt_global_trajectory_buffer
 from util.logging import TimeLogger
@@ -66,7 +66,8 @@ if __name__ == '__main__':
     print("-> Environment intialized.")
 
     #LOAD MODEL
-    model = DQN_Model(input_shape=VISUAL_OBS_SPEC,
+    model = DQN_Model(visual_obs_shape=VISUAL_OBS_SPEC,
+                      vector_obs_shape=VECTOR_OBS_SPEC,
                       num_actions=NUM_ACTIONS,
                       conv_layer_params=CONV_LAYER_PARAMS,
                       fc_layer_params=FC_LAYER_PARAMS,
@@ -107,26 +108,25 @@ if __name__ == '__main__':
             if args.log_time is True: time_logger.log("Global Iterator  ")
 
             #RL LOOP GENERATES A TRAJECTORY
-            obs = np.asarray(env.reset() / 255).astype(np.float32)
+            (visual_obs, vector_obs) = env.reset()
             reward = 0
             done = False
             
             for step in tqdm(range(args.max_steps), "Episode {}".format(episode)):
-                action = model.step_epsilon_greedy(obs, epsilon)
-                new_obs, reward, done, info = env.step(action)
-
-                if done: break
-                obs = np.asarray(new_obs / 255).astype(np.float32)
+                action = model.step_epsilon_greedy(visual_obs, vector_obs, epsilon)
+                new_obs, reward, done = env.step(action)
         
                 if args.log_time is True: time_logger.log("Run Environment  ")
 
-                observation = np.expand_dims(obs, axis=0).flatten().tobytes()
+                visual_obs = np.expand_dims(visual_obs, axis=0).flatten().tobytes()
+                vector_obs = np.expand_dims(vector_obs, axis=0).flatten().tobytes()
                 action = np.asarray(action).astype(np.int32).tobytes()
                 reward = np.asarray(reward).astype(np.float32).tobytes()
 
                 #BUILD PB2 OBJECTS
                 pb2_obs, pb2_actions, pb2_rewards, pb2_info = Observations(), Actions(), Rewards(), Info()
-                pb2_obs.visual_obs = observation
+                pb2_obs.visual_obs = visual_obs
+                pb2_obs.vector_obs = vector_obs
                 pb2_actions.actions = action
                 pb2_rewards.rewards = reward
                 pb2_info.visual_obs_spec.extend(VISUAL_OBS_SPEC)
@@ -151,6 +151,9 @@ if __name__ == '__main__':
                 rows.append(row)
 
                 if args.log_time is True: time_logger.log("Write Cells      ")
+
+                if done: break
+                (visual_obs, vector_obs) = new_obs
         
         #ADD ROWS TO BIGTABLE
         cbt_global_trajectory_buffer(cbt_table, np.asarray(local_traj_buff).astype(np.int32), args.global_traj_buff_size)

@@ -25,7 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('--bucket-id', type=str, default='youngalou') #grpc://35.239.99.173:6470
     parser.add_argument('--prefix', type=str, default='crane-simplereward')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
-    parser.add_argument('--buffer-size', type=int, default=1000)
+    parser.add_argument('--buffer-size', type=int, default=10000)
     parser.add_argument('--batch-size', type=int, default=256)
     parser.add_argument('--num-trajectories', type=int, default=10)
     parser.add_argument('--train-epochs', type=int, default=1000000)

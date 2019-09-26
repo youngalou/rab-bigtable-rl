@@ -80,7 +80,7 @@ class DQN_Model(tf.keras.Model):
     def call(self, visual_obs=None, vector_obs=None):
         if self.convs is not None:
             embedding = self.convs(visual_obs)
-            fc_inputs = tf.concatenate([embedding, vector_obs])
+            fc_inputs = tf.concat([embedding, vector_obs], axis=1)
         else:
             fc_inputs = vector_obs
         value = self.value_head(fc_inputs)
@@ -89,20 +89,20 @@ class DQN_Model(tf.keras.Model):
         return tf.cast(output, dtype=tf.float32)
     
     def step(self, visual_obs=None, vector_obs=None):
-        visual_obs = np.expand_dims(visual_obs, 0) if visual_obs else None
-        vector_obs = np.expand_dims(vector_obs, 0) if vector_obs else None
+        visual_obs = np.expand_dims(visual_obs, 0) if visual_obs is not None else None
+        vector_obs = np.expand_dims(vector_obs, 0) if vector_obs is not None else None
         q_values = tf.squeeze(self(visual_obs, vector_obs))
         action = tf.argmax(q_values).numpy()
         return action
 
     def step_stochastic(self, visual_obs=None, vector_obs=None):
-        visual_obs = np.expand_dims(visual_obs, 0) if visual_obs else None
-        vector_obs = np.expand_dims(vector_obs, 0) if vector_obs else None
+        visual_obs = np.expand_dims(visual_obs, 0) if visual_obs is not None else None
+        vector_obs = np.expand_dims(vector_obs, 0) if vector_obs is not None else None
         logits = self(visual_obs, vector_obs)
         action = tf.squeeze(tf.random.categorical(logits, 1)).numpy()
         return action
 
-    def step_epsilon_greedy(self, visual_obs=None, vector_obs=None, epsilon):
+    def step_epsilon_greedy(self, visual_obs=None, vector_obs=None, epsilon=0):
         sample = np.random.random()
         if sample > 1 - epsilon:
             return np.random.randint(self.num_actions)
@@ -159,4 +159,4 @@ class ExperienceBuffer():
 
     def truncate(self, vis_obs, actions, rewards, next_vis_obs, next_mask):
         split = self.max_size - self.size
-        return vis_obs[:split], vec_obs[:split], actions[:split], rewards[:split], next_vis_obs[:split], next_vec_obs[:split] next_mask[:split]
+        return vis_obs[:split], vec_obs[:split], actions[:split], rewards[:split], next_vis_obs[:split], next_vec_obs[:split], next_mask[:split]

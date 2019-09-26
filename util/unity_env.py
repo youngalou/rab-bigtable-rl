@@ -28,7 +28,7 @@ class UnityEnvironmentWrapper(gym.Env):
         environment_filename: str,
         worker_id: int = 0,
         use_visual: bool = False,
-        use_vector: bool = False
+        use_vector: bool = False,
         flatten_branched: bool = False,
         no_graphics: bool = False,
         allow_multiple_visual_obs: bool = False,
@@ -76,6 +76,7 @@ class UnityEnvironmentWrapper(gym.Env):
                 " visual observations as part of this environment."
             )
         self.use_visual = brain.number_visual_observations >= 1 and use_visual
+        self.use_vector = use_vector
 
         if brain.number_visual_observations > 1 and not self._allow_multiple_visual_obs:
             logger.warning(
@@ -138,7 +139,7 @@ class UnityEnvironmentWrapper(gym.Env):
         """
         current_state = self._env.reset()[self.brain_name]
 
-        obs, reward, done, info = self._single_step(current_state)
+        obs, reward, done = self._single_step(current_state)
         return obs
 
     def step(self, action):
@@ -163,26 +164,23 @@ class UnityEnvironmentWrapper(gym.Env):
 
         current_state = self._env.step(action)[self.brain_name]
 
-        obs, reward, done, info = self._single_step(current_state)
-        return obs, reward, done, info
+        obs, reward, done = self._single_step(current_state)
+        return obs, reward, done
 
     def _single_step(self, current_state):
         if self.use_visual:
             visual_obs = current_state.visual_observations
 
             if self._allow_multiple_visual_obs:
-                visual_obs_list = [self._preprocess_single(obs[0]) for obs in visual_obs]
-                self.visual_obs = np.moveaxis(np.concatenate(visual_obs_list, axis=0), 0, -1)
+                self.visual_obs = np.dstack([obs[0] for obs in visual_obs]).astype(np.float32)
             else:
-                self.visual_obs = self._preprocess_single(visual_obs[0][0])
+                self.visual_obs = visual_obs[0][0]
 
         if self.use_vector:
-            self.vector_obs = current_state.vector_observations[0, :]
+            self.vector_obs = current_state.vector_observations[0, :].astype(np.float32)
 
-        return self.visual_obs, self.vector_obs, current_state.rewards[0], current_state.local_done[0]
+        return (self.visual_obs, self.vector_obs), current_state.rewards[0], current_state.local_done[0]
 
-    def _preprocess_single(self, single_visual_obs):
-        return single_visual_obs.astype(np.float32)
 
     def render(self, mode='rgb_array'):
         img = self.visual_obs
