@@ -55,6 +55,7 @@ class UnityEnvironmentWrapper(gym.Env):
         self.vector_obs = None
         self._flattener = None
         self._allow_multiple_visual_obs = allow_multiple_visual_obs
+        self.viewer = None
 
         # Check brain configuration
         if len(self._env.brains) != 1:
