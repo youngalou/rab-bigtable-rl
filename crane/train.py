@@ -44,7 +44,8 @@ if __name__ == '__main__':
         wandb.init(name=args.wandb,
                    project="rab-bigtable-rl",
                    entity="42 Robolab")
-        wandb.config.update({"input_shape": hyperparams['input_shape'],
+        wandb.config.update({"visual_obs_shape": hyperparams['visual_obs_shape'],
+                             "vector_obs_shape": hyperparams['vector_obs_shape'],
                              "num_actions": hyperparams['num_actions'],
                              "conv_layer_params": hyperparams['conv_layer_params'],
                              "fc_layer_params": hyperparams['fc_layer_params'],
