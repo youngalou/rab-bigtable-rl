@@ -29,7 +29,8 @@ class ValueHead(tf.keras.Model):
                  fc_layer_params,
                  activation='relu'):
         super().__init__()
-        self.fc_layers = [Dense(neurons, activation='relu', name='value_fc_layer_{}'.format(i)) for i,(neurons) in enumerate(fc_layer_params)]
+        self.fc_layers = [Dense(neurons, activation='relu', name='value_fc_layer_{}'.format(i)) \
+                            for i,(neurons) in enumerate(fc_layer_params)]
         self.value_output = Dense(1, name='value_output')
 
     def call(self, inputs):
@@ -43,7 +44,8 @@ class AdvantageHead(tf.keras.Model):
                  num_actions=None,
                  activation='relu'):
         super().__init__()
-        self.fc_layers = [Dense(neurons, activation='relu', name='advantage_fc_layer_{}'.format(i)) for i,(neurons) in enumerate(fc_layer_params)]
+        self.fc_layers = [Dense(neurons, activation='relu', name='advantage_fc_layer_{}'.format(i)) \
+                            for i,(neurons) in enumerate(fc_layer_params)]
         self.advantage_output = Dense(num_actions, name='advantage_output')
 
     def call(self, inputs):
@@ -70,14 +72,15 @@ class DQN_Model(tf.keras.Model):
 
         init_visual_obs = np.zeros(visual_obs_shape, dtype=np.float32) if visual_obs_shape else None
         init_vector_obs = np.zeros(vector_obs_shape, dtype=np.float32) if vector_obs_shape else None
-        self.step(init_visual_obs, init_vector_obs)
+        self.step((init_visual_obs, init_vector_obs))
         self.loss = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.SUM)
         self.opt = tf.optimizers.Adam(learning_rate)
 
         self.num_actions = num_actions
         self.public_url = None
 
-    def call(self, visual_obs=None, vector_obs=None):
+    def call(self, inputs):
+        (visual_obs, vector_obs) = inputs
         if self.convs is not None:
             embedding = self.convs(visual_obs)
             fc_inputs = tf.concat([embedding, vector_obs], axis=1)
@@ -88,29 +91,34 @@ class DQN_Model(tf.keras.Model):
         output = value + (advantage - tf.reduce_mean(advantage))
         return tf.cast(output, dtype=tf.float32)
     
-    def step(self, visual_obs=None, vector_obs=None):
+    def step(self, inputs):
+        (visual_obs, vector_obs) = inputs
         visual_obs = np.expand_dims(visual_obs, 0) if visual_obs is not None else None
         vector_obs = np.expand_dims(vector_obs, 0) if vector_obs is not None else None
-        q_values = tf.squeeze(self(visual_obs, vector_obs))
+        inputs = (visual_obs, vector_obs)
+        q_values = tf.squeeze(self(inputs))
         action = tf.argmax(q_values).numpy()
         return action
 
-    def step_stochastic(self, visual_obs=None, vector_obs=None):
+    def step_stochastic(self, inputs):
+        (visual_obs, vector_obs) = inputs
         visual_obs = np.expand_dims(visual_obs, 0) if visual_obs is not None else None
         vector_obs = np.expand_dims(vector_obs, 0) if vector_obs is not None else None
-        logits = self(visual_obs, vector_obs)
+        inputs = (visual_obs, vector_obs)
+        logits = self(inputs)
         action = tf.squeeze(tf.random.categorical(logits, 1)).numpy()
         return action
 
-    def step_epsilon_greedy(self, visual_obs=None, vector_obs=None, epsilon=0):
+    def step_epsilon_greedy(self, inputs, epsilon=0):
         sample = np.random.random()
         if sample > 1 - epsilon:
             return np.random.randint(self.num_actions)
-        return self.step(visual_obs, vector_obs)
+        return self.step(inputs)
 
 class ExperienceBuffer():
     def __init__(self, max_size, update_horizon):
-        self.vis_obs,  self.vec_obs, self.actions, self.rewards, self.next_vis_obs, self.next_vec_obs, self.next_mask = \
+        self.vis_obs,  self.vec_obs, self.actions, self.rewards, \
+            self.next_vis_obs, self.next_vec_obs, self.next_mask = \
             [], [], [], [], [], [], []
         
         self.max_size = max_size
@@ -120,7 +128,8 @@ class ExperienceBuffer():
     def reset(self):
         self.__init__(self.max_size, self.update_horizon)
 
-    def add_trajectory(self, vis_obs, vec_obs, actions, rewards, num_steps):
+    def add_trajectory(self, obs, actions, rewards, num_steps):
+        (vis_obs, vec_obs) = obs
         shift = self.update_horizon * -1
         next_vis_obs = np.roll(vis_obs, shift=shift, axis=0)
         next_vec_obs = np.roll(vec_obs, shift=shift, axis=0)
@@ -157,6 +166,11 @@ class ExperienceBuffer():
         self.next_vec_obs = np.concatenate(self.next_vec_obs, axis=0)
         self.next_mask = np.concatenate(self.next_mask, axis=0)
 
-    def truncate(self, vis_obs, actions, rewards, next_vis_obs, next_mask):
+    def truncate(self, vis_obs, vec_obs, actions, rewards, next_vis_obs, next_vec_obs, next_mask):
         split = self.max_size - self.size
-        return vis_obs[:split], vec_obs[:split], actions[:split], rewards[:split], next_vis_obs[:split], next_vec_obs[:split], next_mask[:split]
+        return vis_obs[:split], vec_obs[:split], actions[:split], rewards[:split],\
+            next_vis_obs[:split], next_vec_obs[:split], next_mask[:split]
+        
+    def serve_to_dataset(self):
+        return (((self.vis_obs, self.vec_obs), (self.next_vis_obs, self.next_vec_obs)), \
+            (self.actions, self.rewards, self.next_mask))

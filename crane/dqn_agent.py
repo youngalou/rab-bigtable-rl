@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 
 from protobuf.bytes_experience_replay_pb2 import Observations, Actions, Rewards, Info
-from models.dqn_model import DQN_Model, ExperienceBuffer
+from models.dual_obs_dqn_model import DQN_Model, ExperienceBuffer
 from util.gcp_io import gcs_load_weights, gcs_save_weights, cbt_get_global_trajectory_buffer, cbt_read_trajectory
 from util.logging import TimeLogger
 from util.distributions import get_distribution_strategy
@@ -37,7 +37,8 @@ class DQN_Agent():
 
         """
         hyperparams = kwargs['hyperparams']
-        self.input_shape = hyperparams['input_shape']
+        self.visual_obs_shape = hyperparams['visual_obs_shape']
+        self.vector_obs_shape = hyperparams['vector_obs_shape']
         self.num_actions = hyperparams['num_actions']
         self.gamma = hyperparams['gamma']
         self.update_horizon = hyperparams['update_horizon']
@@ -71,17 +72,19 @@ class DQN_Agent():
             self.distribution_strategy = get_distribution_strategy(distribution_strategy='default', num_gpus=self.num_gpus)
             self.device = None
         with tf.device(self.device), self.distribution_strategy.scope():
-            self.model = DQN_Model(input_shape=self.input_shape,
+            self.model = DQN_Model(visual_obs_shape=self.visual_obs_shape,
+                                   vector_obs_shape=self.vector_obs_shape,
                                    num_actions=self.num_actions,
                                    conv_layer_params=hyperparams['conv_layer_params'],
                                    fc_layer_params=hyperparams['fc_layer_params'],
                                    learning_rate=hyperparams['learning_rate'])
-            self.target_model = DQN_Model(input_shape=self.input_shape,
+            self.target_model = DQN_Model(visual_obs_shape=self.visual_obs_shape,
+                                          vector_obs_shape=self.vector_obs_shape,
                                           num_actions=self.num_actions,
                                           conv_layer_params=hyperparams['conv_layer_params'],
                                           fc_layer_params=hyperparams['fc_layer_params'],
                                           learning_rate=hyperparams['learning_rate'])
-        gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
+        gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)   
 
     def fill_experience_buffer(self):
         """
@@ -103,31 +106,35 @@ class DQN_Agent():
 
             if self.log_time is True: self.time_logger.log("Fetch Data      ")
         
-            observations, actions, rewards, total_rewards = [], [], [], []
+            visual_obs, vector_obs, actions, rewards, total_rewards = [], [], [], [], []
             for row in rows:
                 #DESERIALIZE DATA
                 bytes_obs = row.cells['step']['obs'.encode()][0].value
                 bytes_action = row.cells['step']['action'.encode()][0].value
                 bytes_reward = row.cells['step']['reward'.encode()][0].value
-                bytes_info = row.cells['step']['info'.encode()][0].value
+                # bytes_info = row.cells['step']['info'.encode()][0].value
                 
                 pb2_obs, pb2_actions, pb2_rewards, info = Observations(), Actions(), Rewards(), Info()
                 pb2_obs.ParseFromString(bytes_obs)
                 pb2_actions.ParseFromString(bytes_action)
                 pb2_rewards.ParseFromString(bytes_reward)
-                info.ParseFromString(bytes_info)
+                # info.ParseFromString(bytes_info)
 
                 #FORMAT DATA
-                obs_shape = np.append(1, info.visual_obs_spec).astype(np.int32)
-                observations.append(np.frombuffer(pb2_obs.visual_obs, dtype=np.float32).reshape(obs_shape))
+                vis_obs_shape = np.append(1, self.visual_obs_shape).astype(np.int32)
+                vec_obs_shape = np.append(1, self.vector_obs_shape).astype(np.int32)
+                visual_obs.append(np.frombuffer(pb2_obs.visual_obs, dtype=np.float32).reshape(vis_obs_shape))
+                vector_obs.append(np.frombuffer(pb2_obs.vector_obs, dtype=np.float32).reshape(vec_obs_shape))
                 actions.append(np.frombuffer(pb2_actions.actions, dtype=np.int32))
                 rewards.append(np.frombuffer(pb2_rewards.rewards, dtype=np.float32))
 
                 if self.log_time is True: self.time_logger.log("Parse Bytes     ")
 
-            obs = np.concatenate(observations, axis=0)
+            visual_obs = np.concatenate(visual_obs, axis=0)
+            vector_obs = np.concatenate(vector_obs, axis=0)
             actions = np.concatenate(actions, axis=0)
             rewards = np.concatenate(rewards, axis=0)
+            obs = (visual_obs, vector_obs)
 
             num_steps = len(rewards)
             total_rewards.append(np.sum(rewards))
@@ -145,14 +152,10 @@ class DQN_Agent():
 
             self.exp_buff.add_trajectory(obs, actions, discounted_future_rewards, num_steps)
 
-            print(self.exp_buff.size)
-
             if self.exp_buff.size >= self.exp_buff.max_size: break
         self.exp_buff.preprocess()
 
-        dataset = tf.data.Dataset.from_tensor_slices(
-            ((self.exp_buff.obs, self.exp_buff.next_obs),
-            (self.exp_buff.actions, self.exp_buff.rewards, self.exp_buff.next_mask)))
+        dataset = tf.data.Dataset.from_tensor_slices(self.exp_buff.serve_to_dataset())
         dataset = dataset.shuffle(self.exp_buff.max_size).repeat().batch(self.batch_size)
 
         dist_dataset = self.distribution_strategy.experimental_distribute_dataset(dataset)

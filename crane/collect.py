@@ -27,7 +27,7 @@ NUM_ACTIONS=8
 CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
 FC_LAYER_PARAMS=(512,)
 LEARNING_RATE=0.00042
-EPS_START = 0.9
+EPS_START = 0.8
 EPS_FINAL = 0.2
 EPS_STEPS = 10000
 
@@ -36,10 +36,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
-    parser.add_argument('--cbt-table-name', type=str, default='crane-simplereward-experience-replay')
+    parser.add_argument('--cbt-table-name', type=str, default='crane-dualobs-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='youngalou')
     parser.add_argument('--env-filename', type=str, default='envs/CraneML.x86_64')
-    parser.add_argument('--prefix', type=str, default='crane-simplereward')
+    parser.add_argument('--prefix', type=str, default='crane-dualobs')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000000)
     parser.add_argument('--num-episodes', type=int, default=1)
@@ -108,16 +108,17 @@ if __name__ == '__main__':
             if args.log_time is True: time_logger.log("Global Iterator  ")
 
             #RL LOOP GENERATES A TRAJECTORY
-            (visual_obs, vector_obs) = env.reset()
+            obs = env.reset()
             reward = 0
             done = False
             
             for step in tqdm(range(args.max_steps), "Episode {}".format(episode)):
-                action = model.step_epsilon_greedy(visual_obs, vector_obs, epsilon)
+                action = model.step_epsilon_greedy(obs, epsilon)
                 new_obs, reward, done = env.step(action)
         
                 if args.log_time is True: time_logger.log("Run Environment  ")
 
+                (visual_obs, vector_obs) = obs
                 visual_obs = np.expand_dims(visual_obs, axis=0).flatten().tobytes()
                 vector_obs = np.expand_dims(vector_obs, axis=0).flatten().tobytes()
                 action = np.asarray(action).astype(np.int32).tobytes()
@@ -130,6 +131,7 @@ if __name__ == '__main__':
                 pb2_actions.actions = action
                 pb2_rewards.rewards = reward
                 pb2_info.visual_obs_spec.extend(VISUAL_OBS_SPEC)
+                pb2_info.vector_obs_spec.extend(VECTOR_OBS_SPEC)
 
                 if args.log_time is True: time_logger.log("Data To Bytes    ")
 
@@ -153,7 +155,7 @@ if __name__ == '__main__':
                 if args.log_time is True: time_logger.log("Write Cells      ")
 
                 if done: break
-                (visual_obs, vector_obs) = new_obs
+                obs = new_obs
         
         #ADD ROWS TO BIGTABLE
         cbt_global_trajectory_buffer(cbt_table, np.asarray(local_traj_buff).astype(np.int32), args.global_traj_buff_size)

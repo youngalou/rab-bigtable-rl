@@ -8,7 +8,8 @@ SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 hyperparams = dict([
-    ('input_shape', [224,224,3]),
+    ('visual_obs_shape', [224,224,2]),
+    ('vector_obs_shape', [29]),
     ('num_actions', 8),
     ('conv_layer_params', ((8,4,32),(4,2,64),(3,1,64))),
     ('fc_layer_params', (512,)),
@@ -21,11 +22,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
-    parser.add_argument('--cbt-table-name', type=str, default='crane-simplereward-experience-replay')
-    parser.add_argument('--bucket-id', type=str, default='youngalou') #grpc://35.239.99.173:6470
-    parser.add_argument('--prefix', type=str, default='crane-simplereward')
+    parser.add_argument('--cbt-table-name', type=str, default='crane-dualobs-experience-replay')
+    parser.add_argument('--bucket-id', type=str, default='youngalou')
+    parser.add_argument('--prefix', type=str, default='crane-dualobs')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
-    parser.add_argument('--buffer-size', type=int, default=10000)
+    parser.add_argument('--buffer-size', type=int, default=1000)
     parser.add_argument('--batch-size', type=int, default=256)
     parser.add_argument('--num-trajectories', type=int, default=10)
     parser.add_argument('--train-epochs', type=int, default=1000000)
