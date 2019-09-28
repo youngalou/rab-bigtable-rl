@@ -21,12 +21,11 @@ SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 #SET HYPERPARAMETERS
-VECTOR_OBS_SPEC = [29]
 VISUAL_OBS_SPEC = [224,224,2]
+VECTOR_OBS_SPEC = [29]
 NUM_ACTIONS=8
 CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
 FC_LAYER_PARAMS=(512,)
-LEARNING_RATE=0.00042
 EPS_START = 0.8
 EPS_FINAL = 0.2
 EPS_STEPS = 10000
@@ -46,6 +45,7 @@ if __name__ == '__main__':
     parser.add_argument('--max-steps', type=int, default=1000)
     parser.add_argument('--update-interval', type=int, default=1)
     parser.add_argument('--global-traj-buff-size', type=int, default=10)
+    parser.add_argument('--frame-skip', type=int, default=5)
     parser.add_argument('--log-time', default=False, action='store_true')
     parser.add_argument('--docker-training', type=bool, default=False)
     args = parser.parse_args()
@@ -70,8 +70,7 @@ if __name__ == '__main__':
                       vector_obs_shape=VECTOR_OBS_SPEC,
                       num_actions=NUM_ACTIONS,
                       conv_layer_params=CONV_LAYER_PARAMS,
-                      fc_layer_params=FC_LAYER_PARAMS,
-                      learning_rate=LEARNING_RATE)
+                      fc_layer_params=FC_LAYER_PARAMS)
 
     #INITIALIZE EXECUTION TIME LOGGER
     if args.log_time is True:
@@ -115,6 +114,11 @@ if __name__ == '__main__':
             for step in tqdm(range(args.max_steps), "Episode {}".format(episode)):
                 action = model.step_epsilon_greedy(obs, epsilon)
                 new_obs, reward, done = env.step(action)
+                skip_action = action if action != 7 else 0
+                sum_reward = reward
+                for _ in range(args.frame_skip-1):
+                    new_obs, reward, done = env.step(skip_action)
+                    sum_reward += reward
         
                 if args.log_time is True: time_logger.log("Run Environment  ")
 
@@ -122,7 +126,7 @@ if __name__ == '__main__':
                 visual_obs = np.expand_dims(visual_obs, axis=0).flatten().tobytes()
                 vector_obs = np.expand_dims(vector_obs, axis=0).flatten().tobytes()
                 action = np.asarray(action).astype(np.int32).tobytes()
-                reward = np.asarray(reward).astype(np.float32).tobytes()
+                reward = np.asarray(sum_reward).astype(np.float32).tobytes()
 
                 #BUILD PB2 OBJECTS
                 pb2_obs, pb2_actions, pb2_rewards, pb2_info = Observations(), Actions(), Rewards(), Info()
