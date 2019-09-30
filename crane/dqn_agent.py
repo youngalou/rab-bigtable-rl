@@ -84,7 +84,7 @@ class DQN_Agent():
                                           conv_layer_params=hyperparams['conv_layer_params'],
                                           fc_layer_params=hyperparams['fc_layer_params'],
                                           learning_rate=hyperparams['learning_rate'])
-        gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)   
+        gcs_load_weights(self.model, self.gcs_bucket, self.prefix, self.tmp_weights_filepath)
 
     def fill_experience_buffer(self):
         """
@@ -130,13 +130,15 @@ class DQN_Agent():
 
                 if self.log_time is True: self.time_logger.log("Parse Bytes     ")
 
+            num_steps = len(rewards)
+            if num_steps <= self.update_horizon: continue
+
             visual_obs = np.concatenate(visual_obs, axis=0)
             vector_obs = np.concatenate(vector_obs, axis=0)
             actions = np.concatenate(actions, axis=0)
             rewards = np.concatenate(rewards, axis=0)
             obs = (visual_obs, vector_obs)
 
-            num_steps = len(rewards)
             total_rewards.append(np.sum(rewards))
             discounted_future_rewards = []
             for i in range(num_steps):

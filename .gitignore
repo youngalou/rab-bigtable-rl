@@ -7,3 +7,4 @@ get-pip.py
 __pycache__
 wandb
 mnist.py
+UnitySDK.log

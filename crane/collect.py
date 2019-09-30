@@ -35,14 +35,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
-    parser.add_argument('--cbt-table-name', type=str, default='rab-arms-dualobs-frameskip-experience-replay')
+    parser.add_argument('--cbt-table-name', type=str, default='rab-arms-frameskip-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='youngalou')
-    parser.add_argument('--env-filename', type=str, default='envs/CraneML.x86_64')
-    parser.add_argument('--prefix', type=str, default='rab-arms-dualobs-frameskip')
+    parser.add_argument('--env-filename', type=str, default='envs/RabRobotArm_frameskip/RabRobotArm_0927.x86_64')
+    parser.add_argument('--prefix', type=str, default='rab-arms-frameskip')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000000)
-    parser.add_argument('--num-episodes', type=int, default=1)
-    parser.add_argument('--max-steps', type=int, default=1000)
+    parser.add_argument('--num-episodes', type=int, default=5)
+    parser.add_argument('--max-steps', type=int, default=100)
     parser.add_argument('--update-interval', type=int, default=1)
     parser.add_argument('--global-traj-buff-size', type=int, default=10)
     parser.add_argument('--frame-skip', type=int, default=5)
@@ -114,11 +114,6 @@ if __name__ == '__main__':
             for step in tqdm(range(args.max_steps), "Episode {}".format(episode)):
                 action = model.step_epsilon_greedy(obs, epsilon)
                 new_obs, reward, done = env.step(action)
-                skip_action = action if action != 7 else 0
-                sum_reward = reward
-                for _ in range(args.frame_skip-1):
-                    new_obs, reward, done = env.step(skip_action)
-                    sum_reward += reward
         
                 if args.log_time is True: time_logger.log("Run Environment  ")
 
@@ -126,7 +121,7 @@ if __name__ == '__main__':
                 visual_obs = np.expand_dims(visual_obs, axis=0).flatten().tobytes()
                 vector_obs = np.expand_dims(vector_obs, axis=0).flatten().tobytes()
                 action = np.asarray(action).astype(np.int32).tobytes()
-                reward = np.asarray(sum_reward).astype(np.float32).tobytes()
+                reward = np.asarray(reward).astype(np.float32).tobytes()
 
                 #BUILD PB2 OBJECTS
                 pb2_obs, pb2_actions, pb2_rewards, pb2_info = Observations(), Actions(), Rewards(), Info()
