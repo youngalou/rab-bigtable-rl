@@ -127,6 +127,8 @@ class DQN_Agent():
             rewards = np.concatenate(rewards, axis=0)
 
             num_steps = len(rewards)
+            if num_steps <= self.update_horizon: continue
+            
             total_rewards.append(np.sum(rewards))
             discounted_future_rewards = []
             for i in range(num_steps):
