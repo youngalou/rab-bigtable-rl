@@ -37,7 +37,7 @@ if __name__ == '__main__':
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
     parser.add_argument('--cbt-table-name', type=str, default='breakout-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='youngalou')
-    parser.add_argument('--prefix', type=str, default='breakout')
+    parser.add_argument('--prefix', type=str, default='breakout_dqn')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000000)
     parser.add_argument('--num-episodes', type=int, default=1)
