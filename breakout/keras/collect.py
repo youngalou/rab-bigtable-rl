@@ -28,21 +28,21 @@ CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
 FC_LAYER_PARAMS=(512,)
 EPS_START = 0.8
 EPS_FINAL = 0.2
-EPS_STEPS = 10000
+EPS_STEPS = 3000
 
 if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
-    parser.add_argument('--cbt-table-name', type=str, default='bytes-breakout-experience-replay')
+    parser.add_argument('--cbt-table-name', type=str, default='breakout-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='youngalou')
     parser.add_argument('--prefix', type=str, default='breakout')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000000)
     parser.add_argument('--num-episodes', type=int, default=1)
     parser.add_argument('--max-steps', type=int, default=1000)
-    parser.add_argument('--update-interval', type=int, default=10)
+    parser.add_argument('--update-interval', type=int, default=5)
     parser.add_argument('--global-traj-buff-size', type=int, default=10)
     parser.add_argument('--log-time', default=False, action='store_true')
     args = parser.parse_args()

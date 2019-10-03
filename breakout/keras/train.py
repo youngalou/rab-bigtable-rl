@@ -12,8 +12,8 @@ hyperparams = dict([
     ('num_actions', 4),
     ('conv_layer_params', ((8,4,32),(4,2,64),(3,1,64))),
     ('fc_layer_params', (512,)),
-    ('gamma', 0.9),
-    ('update_horizon', 5),
+    ('gamma', 0.95),
+    ('update_horizon', 10),
     ('learning_rate', 0.00042)
 ])
 
@@ -21,7 +21,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('Environment-To-Bigtable Script')
     parser.add_argument('--gcp-project-id', type=str, default='for-robolab-cbai')
     parser.add_argument('--cbt-instance-id', type=str, default='rab-rl-bigtable')
-    parser.add_argument('--cbt-table-name', type=str, default='bytes-breakout-experience-replay')
+    parser.add_argument('--cbt-table-name', type=str, default='breakout-experience-replay')
     parser.add_argument('--bucket-id', type=str, default='youngalou')
     parser.add_argument('--prefix', type=str, default='breakout')
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
