@@ -103,10 +103,10 @@ class DQN_Agent():
             observations, actions, rewards, total_rewards = [], [], [], []
             for row in rows:
                 #DESERIALIZE DATA
-                bytes_obs = row.cells['trajectory']['obs'.encode()][0].value
-                bytes_action = row.cells['trajectory']['actions'.encode()][0].value
-                bytes_reward = row.cells['trajectory']['rewards'.encode()][0].value
-                bytes_info = row.cells['trajectory']['info'.encode()][0].value
+                bytes_obs = row.cells['step']['obs'.encode()][0].value
+                bytes_action = row.cells['step']['action'.encode()][0].value
+                bytes_reward = row.cells['step']['reward'.encode()][0].value
+                bytes_info = row.cells['step']['info'.encode()][0].value
                 
                 pb2_obs, pb2_actions, pb2_rewards, info = Observations(), Actions(), Rewards(), Info()
                 pb2_obs.ParseFromString(bytes_obs)

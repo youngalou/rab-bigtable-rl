@@ -22,12 +22,13 @@ SCOPES = ['https://www.googleapis.com/auth/cloud-platform']
 SERVICE_ACCOUNT_FILE = 'cbt_credentials.json'
 
 #SET HYPERPARAMETERS
-VISUAL_OBS_SPEC = [210,160,3]
+VISUAL_OBS_SPEC=[210,160,3]
 NUM_ACTIONS=4
 CONV_LAYER_PARAMS=((8,4,32),(4,2,64),(3,1,64))
 FC_LAYER_PARAMS=(512,)
-LEARNING_RATE=0.00042
-EPSILON = 0.5
+EPS_START = 0.8
+EPS_FINAL = 0.2
+EPS_STEPS = 10000
 
 if __name__ == '__main__':
     #COMMAND-LINE ARGUMENTS
@@ -40,7 +41,7 @@ if __name__ == '__main__':
     parser.add_argument('--tmp-weights-filepath', type=str, default='/tmp/model_weights_tmp.h5')
     parser.add_argument('--num-cycles', type=int, default=1000000)
     parser.add_argument('--num-episodes', type=int, default=1)
-    parser.add_argument('--max-steps', type=int, default=100)
+    parser.add_argument('--max-steps', type=int, default=1000)
     parser.add_argument('--update-interval', type=int, default=10)
     parser.add_argument('--global-traj-buff-size', type=int, default=10)
     parser.add_argument('--log-time', default=False, action='store_true')
@@ -58,11 +59,10 @@ if __name__ == '__main__':
     print("-> Environment intialized.")
 
     #LOAD MODEL
-    model = DQN_Model(input_shape=env.observation_space.shape,
-                      num_actions=env.action_space.n,
+    model = DQN_Model(input_shape=VISUAL_OBS_SPEC,
+                      num_actions=NUM_ACTIONS,
                       conv_layer_params=CONV_LAYER_PARAMS,
-                      fc_layer_params=FC_LAYER_PARAMS,
-                      learning_rate=LEARNING_RATE)
+                      fc_layer_params=FC_LAYER_PARAMS)
 
     #INITIALIZE EXECUTION TIME LOGGER
     if args.log_time is True:
@@ -91,6 +91,11 @@ if __name__ == '__main__':
             global_i = cbt_global_iterator(cbt_table)
             local_traj_buff.append(global_i)
 
+            if global_i < EPS_STEPS:
+                epsilon = EPS_START - (((EPS_START - EPS_FINAL) / EPS_STEPS) * global_i)
+            else:
+                epsilon = EPS_FINAL
+
             if args.log_time is True: time_logger.log("Global Iterator  ")
 
             #RL LOOP GENERATES A TRAJECTORY
@@ -99,11 +104,8 @@ if __name__ == '__main__':
             done = False
             
             for step in tqdm(range(args.max_steps), "Episode {}".format(episode)):
-                action = model.step_epsilon_greedy(obs, EPSILON)
+                action = model.step_epsilon_greedy(obs, epsilon)
                 new_obs, reward, done, info = env.step(action)
-
-                if done: break
-                obs = np.asarray(new_obs / 255).astype(np.float32)
         
                 if args.log_time is True: time_logger.log("Run Environment  ")
 
@@ -123,21 +125,24 @@ if __name__ == '__main__':
                 #WRITE TO AND APPEND ROW
                 row_key = 'traj_{:05d}_step_{:05d}'.format(global_i, step).encode()
                 row = cbt_table.row(row_key)
-                row.set_cell(column_family_id='trajectory',
+                row.set_cell(column_family_id='step',
                             column='obs'.encode(),
                             value=pb2_obs.SerializeToString())
-                row.set_cell(column_family_id='trajectory',
-                            column='actions'.encode(),
+                row.set_cell(column_family_id='step',
+                            column='action'.encode(),
                             value=pb2_actions.SerializeToString())
-                row.set_cell(column_family_id='trajectory',
-                            column='rewards'.encode(),
+                row.set_cell(column_family_id='step',
+                            column='reward'.encode(),
                             value=pb2_rewards.SerializeToString())
-                row.set_cell(column_family_id='trajectory',
+                row.set_cell(column_family_id='step',
                             column='info'.encode(),
                             value=pb2_info.SerializeToString())
                 rows.append(row)
 
                 if args.log_time is True: time_logger.log("Write Cells      ")
+
+                if done: break
+                obs = np.asarray(new_obs / 255).astype(np.float32)
         
         #ADD ROWS TO BIGTABLE
         cbt_global_trajectory_buffer(cbt_table, np.asarray(local_traj_buff).astype(np.int32), args.global_traj_buff_size)

@@ -33,7 +33,7 @@ if __name__ == '__main__':
     parser.add_argument('--period', type=int, default=1)
     parser.add_argument('--log-time', default=False, action='store_true')
     parser.add_argument('--num-gpus', type=int, default=0)
-    parser.add_argument('--tpu-name', type=str, default='youngalou')
+    parser.add_argument('--tpu-name', type=str, default='grpc://10.240.1.2:8470')
     parser.add_argument('--wandb', type=str, default=None)
     args = parser.parse_args()
 
@@ -50,7 +50,6 @@ if __name__ == '__main__':
                              "learning_rate": hyperparams['learning_rate'],
                              "buffer_size": args.buffer_size,
                              "batch_size": args.batch_size,
-                             "num_trajectories": args.num_trajectories,
                              "train_epochs": args.train_epochs,
                              "train_steps": args.train_steps,
                              "period": args.period,
