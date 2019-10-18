@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package tf_agents_trajectory;
+
+message CurrentTimeStep {
+    bytes step_type = 1;
+    bytes observation = 2;
+}
+
+message ActionStep {
+    bytes action = 3;
+    bytes policy_info = 4;
+}
+
+message NextTimeStep {
+    bytes step_type = 5;
+    bytes reward = 6;
+    bytes discount = 7;
+}
